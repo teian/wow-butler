@@ -31,3 +31,46 @@ flutter run -d linux
 ```
 
 Git-Backups benötigen ein installiertes `git`.
+
+## Desktop-Builds
+
+Release-Builds werden auf dem jeweiligen Betriebssystem erstellt. Voraussetzungen:
+Flutter aus `mise.toml`, Python 3.9+ und die native Toolchain (`flutter doctor`).
+
+- **Linux:** Clang, CMake, Ninja, pkg-config und GTK-3-Entwicklungsbibliotheken.
+- **Windows:** Visual Studio 2022 mit „Desktop development with C++“ und Windows SDK.
+- **macOS:** Xcode und seine Command Line Tools; CocoaPods für Plugins, die es benötigen.
+
+Auf dem jeweiligen System im Projektordner ausführen:
+
+```bash
+python tool/build_desktop.py linux
+python tool/build_desktop.py windows
+python tool/build_desktop.py macos
+```
+
+Ohne Plattformargument wird das aktuelle Betriebssystem gewählt. Auf Systemen mit
+`python3` statt `python` entsprechend `python3 tool/build_desktop.py` verwenden.
+Mit `--skip-build` wird ein vorhandener Release-Build erneut verpackt.
+
+Die Archive und SHA-256-Prüfsummen liegen in `dist/`:
+
+| Plattform | Archiv | Start nach dem Entpacken |
+| --- | --- | --- |
+| Linux | `wow-butler-<version>-linux-<arch>.tar.gz` | `wow-butler/wow_butler` |
+| Windows | `wow-butler-<version>-windows-<arch>.zip` | `wow-butler/wow_butler.exe` |
+| macOS | `wow-butler-<version>-macos-<arch>.zip` | `wow_butler.app` in „Programme“ verschieben |
+
+Unter Windows und Linux den gesamten entpackten Ordner einschließlich Bibliotheken
+und `data/` behalten. Linux benötigt GTK 3 und die üblichen Desktop-Systembibliotheken;
+Windows benötigt die Microsoft Visual C++ Redistributable für die Zielarchitektur.
+macOS wird standardmäßig für Intel und Apple Silicon gebaut (`universal`);
+bei einer lokal konfigurierten Einzelarchitektur heißt das Archiv entsprechend
+`arm64` oder `x64`. Die macOS-App ist für direkte
+Verteilung ohne App Sandbox konfiguriert, damit WoW-Ordner und Git erreichbar sind.
+Die Builds enthalten keine Publisher-Signatur oder Apple-Notarisierung.
+
+Der GitHub-Actions-Workflow `.github/workflows/desktop.yml` baut und prüft alle drei
+Plattformen auf nativen Runnern bei Push, Pull Request und manuellem Start. Nach
+einem erfolgreichen Lauf können die Archive unter **Actions → Desktop builds →
+Artifacts** heruntergeladen werden. Die Flutter-Version wird aus `mise.toml` gelesen.
