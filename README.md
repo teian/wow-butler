@@ -74,3 +74,8 @@ Der GitHub-Actions-Workflow `.github/workflows/desktop.yml` baut und prüft alle
 Plattformen auf nativen Runnern bei Push, Pull Request und manuellem Start. Nach
 einem erfolgreichen Lauf können die Archive unter **Actions → Desktop builds →
 Artifacts** heruntergeladen werden. Die Flutter-Version wird aus `mise.toml` gelesen.
+
+## Lizenz
+
+WoW Butler ist freie Software unter der
+[GNU General Public License v3.0](LICENSE) (GPL-3.0).
