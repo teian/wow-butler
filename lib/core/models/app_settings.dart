@@ -170,6 +170,7 @@ class AppSettings {
     AddonSourceId.wago,
     AddonSourceId.curseforge,
     AddonSourceId.wowup,
+    AddonSourceId.wowinterface,
     AddonSourceId.github,
   ];
 

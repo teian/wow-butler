@@ -7,6 +7,7 @@ enum AddonSourceId {
   wago('Wago'),
   wowup('WowUp Hub'),
   tukui('TukUI'),
+  wowinterface('WoWInterface'),
   github('GitHub');
 
   const AddonSourceId(this.label);

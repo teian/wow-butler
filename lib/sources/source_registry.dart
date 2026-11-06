@@ -6,6 +6,7 @@ import 'curseforge_source.dart';
 import 'github_source.dart';
 import 'tukui_source.dart';
 import 'wago_source.dart';
+import 'wowinterface_source.dart';
 import 'wowup_source.dart';
 
 /// All sources configured from the current settings.
@@ -21,6 +22,7 @@ class SourceRegistry {
         AddonSourceId.wago: WagoSource(api, settings.wagoApiKey),
         AddonSourceId.wowup: WowUpSource(api),
         AddonSourceId.tukui: TukuiSource(api),
+        AddonSourceId.wowinterface: WowInterfaceSource(api),
         AddonSourceId.github: GitHubSource(api, settings.githubToken),
       };
 

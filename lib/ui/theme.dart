@@ -149,6 +149,11 @@ class AppTheme {
       fg: const Color(0xFF0D9488),
       bg: const Color(0xFF0D9488).withValues(alpha: 0.14),
     ),
+    // Minion green, WoWInterface's own accent.
+    AddonSourceId.wowinterface => (
+      fg: const Color(0xFF65A30D),
+      bg: const Color(0xFF65A30D).withValues(alpha: 0.14),
+    ),
     AddonSourceId.github || null => (fg: w.fg2, bg: w.chip),
   };
 }

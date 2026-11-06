@@ -403,6 +403,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           AddonSourceId.wago => 'Wago Addons',
           AddonSourceId.wowup => 'GitHub-Addons aus dem WowUp Hub',
           AddonSourceId.tukui => 'ElvUI und Tukui direkt von tukui.org',
+          AddonSourceId.wowinterface => 'Addons von wowinterface.com',
           AddonSourceId.github => 'Releases aus beliebigen Repositories',
         };
 

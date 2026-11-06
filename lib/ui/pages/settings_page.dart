@@ -267,6 +267,8 @@ class _SourcesCard extends ConsumerWidget {
       AddonSourceId.wago => 'Wago-API-Key für Addons',
       AddonSourceId.wowup => 'GitHub-Addons aus dem WowUp Hub',
       AddonSourceId.tukui => 'ElvUI und Tukui direkt von tukui.org',
+      AddonSourceId.wowinterface =>
+        'Addons von wowinterface.com über die Minion-API',
       AddonSourceId.github =>
         'Releases aus Repositories, Token hebt das Rate-Limit',
     };
