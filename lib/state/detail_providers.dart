@@ -113,3 +113,12 @@ final remoteDetailsProvider = FutureProvider.autoDispose
       final source = ref.read(sourcesProvider)[addon.source];
       return source.details(addon, flavor ?? GameFlavor.retail);
     });
+
+/// The same source details for an installed (managed) addon, so the
+/// installed detail page shows what the discover page shows.
+final installedDetailsProvider = FutureProvider.autoDispose
+    .family<AddonDetails?, AddonKey>((ref, key) async {
+      final remote = await ref.watch(addonRemoteProvider(key).future);
+      if (remote == null) return null;
+      return ref.watch(remoteDetailsProvider(remote).future);
+    });

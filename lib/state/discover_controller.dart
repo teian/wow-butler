@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models/addon.dart';
+import '../core/models/addon_category.dart';
 import '../core/models/wow_installation.dart';
 import 'providers.dart';
 import 'settings_controller.dart';
@@ -14,6 +15,7 @@ class DiscoverState {
     this.loading = false,
     this.errors = const {},
     this.sourceFilter,
+    this.category,
   });
 
   final String query;
@@ -23,6 +25,9 @@ class DiscoverState {
 
   /// Restricts results to one source; `null` shows all.
   final AddonSourceId? sourceFilter;
+
+  /// Narrows browsing to one category; `null` shows everything.
+  final AddonCategory? category;
 
   List<RemoteAddon> get visible => sourceFilter == null
       ? results
@@ -35,12 +40,15 @@ class DiscoverState {
     Map<AddonSourceId, String>? errors,
     AddonSourceId? sourceFilter,
     bool clearFilter = false,
+    AddonCategory? category,
+    bool clearCategory = false,
   }) => DiscoverState(
     query: query ?? this.query,
     results: results ?? this.results,
     loading: loading ?? this.loading,
     errors: errors ?? this.errors,
     sourceFilter: clearFilter ? null : sourceFilter ?? this.sourceFilter,
+    category: clearCategory ? null : category ?? this.category,
   );
 }
 
@@ -74,6 +82,13 @@ class DiscoverController extends Notifier<DiscoverState> {
       ? state.copyWith(clearFilter: true)
       : state.copyWith(sourceFilter: source);
 
+  void setCategory(AddonCategory? category) {
+    state = category == null
+        ? state.copyWith(clearCategory: true)
+        : state.copyWith(category: category);
+    _run(state.query);
+  }
+
   Future<void> refresh() => _run(state.query);
 
   Future<void> _run(String query) async {
@@ -84,7 +99,17 @@ class DiscoverController extends Notifier<DiscoverState> {
     }
     final generation = ++_generation;
     state = state.copyWith(loading: true, errors: const {});
-    final q = query.trim();
+    var q = query.trim();
+    var category = state.category;
+    // A query that names a category exactly (e.g. "minimap", "quests")
+    // works as a tag and browses that category instead.
+    if (category == null) {
+      final tagged = AddonCategory.parse(q);
+      if (tagged != null) {
+        category = tagged;
+        q = '';
+      }
+    }
     final sources = ref.read(sourcesProvider).active;
 
     final perSource = <AddonSourceId, List<RemoteAddon>>{};
@@ -92,9 +117,7 @@ class DiscoverController extends Notifier<DiscoverState> {
     await Future.wait(
       sources.map((s) async {
         try {
-          perSource[s.id] = q.isEmpty
-              ? await s.featured(inst.flavor)
-              : await s.search(q, inst.flavor);
+          perSource[s.id] = await s.browse(q, inst.flavor, category: category);
         } catch (e) {
           errors[s.id] = '$e';
         }

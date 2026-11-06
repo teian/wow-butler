@@ -403,6 +403,33 @@ class AddonsController extends Notifier<AddonsState> {
   Future<void> setPinned(Iterable<String> ids, bool value) =>
       _modify(ids, (a) => a.copyWith(pinned: value));
 
+  /// Links an installed addon to [remote] without reinstalling it. The
+  /// installed release is recognized by version when possible; otherwise
+  /// the next update simply installs the source's current release.
+  Future<void> assignSource(InstalledAddon addon, RemoteAddon remote) async {
+    String norm(String? v) => (v ?? '').replaceFirst(RegExp(r'^[vV]'), '');
+    final installed = addon.installedVersion == null
+        ? null
+        : remote.releases
+              .where((r) => norm(r.version) == norm(addon.installedVersion))
+              .firstOrNull;
+    await _modify(
+      [addon.id],
+      (a) => a.copyWith(
+        name: remote.name,
+        source: remote.source,
+        externalId: remote.externalId,
+        author: remote.author,
+        summary: remote.summary,
+        thumbnailUrl: remote.thumbnailUrl,
+        websiteUrl: remote.websiteUrl,
+        installedReleaseId: installed?.id,
+        latestRelease: remote.latestFor(a.channel),
+      ),
+    );
+    _log.success('${remote.name} ist jetzt ${remote.source.label} zugeordnet');
+  }
+
   Future<void> _modify(
     Iterable<String> ids,
     InstalledAddon Function(InstalledAddon) f,

@@ -10,6 +10,8 @@ import '../../state/nav_controller.dart';
 import '../../state/settings_controller.dart';
 import '../format.dart';
 import '../tokens.dart';
+import '../widgets/addon_media.dart';
+import '../widgets/assign_source_dialog.dart';
 import '../widgets/primitives.dart';
 import 'my_addons_page.dart' show gameVersionOf;
 
@@ -157,7 +159,22 @@ class AddonDetailPage extends ConsumerWidget {
               const SizedBox(width: 16),
               SizedBox(
                 width: 320,
-                child: _Manage(inst: inst, addon: addon),
+                child: Column(
+                  children: [
+                    _Manage(inst: inst, addon: addon),
+                    if (addon.isManaged) ...[
+                      const SizedBox(height: 16),
+                      Consumer(
+                        builder: (context, ref, _) => CompatCard(
+                          flavors: ref
+                              .watch(installedDetailsProvider(key))
+                              .value
+                              ?.flavors,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -271,14 +288,32 @@ class _Overview extends ConsumerWidget {
       child: Text(text, style: WText.caps(w.muted)),
     );
 
+    final details = addon.isManaged
+        ? ref.watch(installedDetailsProvider(addonKey))
+        : const AsyncValue<AddonDetails?>.data(null);
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            addon.summary ?? 'Keine Beschreibung vorhanden.',
-            style: TextStyle(fontSize: 14, height: 1.65, color: w.fg2),
+          if (addon.isManaged) ...[
+            if (details.isLoading)
+              const ScreenshotPlaceholder(loading: true)
+            else if ((details.value?.screenshots ?? const []).isEmpty)
+              NoScreenshots(sourceLabel: addon.source!.label)
+            else
+              ScreenshotGallery(
+                key: ValueKey(addon.id),
+                urls: details.value!.screenshots,
+                sourceLabel: addon.source!.label,
+              ),
+            const SizedBox(height: 16),
+          ],
+          DescriptionBody(
+            details: details.value,
+            loading: details.isLoading,
+            fallbackSummary: addon.summary,
           ),
           const SizedBox(height: 16),
           Container(
@@ -724,6 +759,15 @@ class _Manage extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
+        WButton(
+          label: addon.isManaged ? 'Andere Quelle zuordnen' : 'Quelle zuordnen',
+          icon: Icons.link_rounded,
+          kind: addon.isManaged ? WButtonKind.outline : WButtonKind.blue,
+          expand: true,
+          onPressed: () =>
+              showAssignSourceDialog(context, inst: inst, addon: addon),
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
             if (addon.isManaged) ...[

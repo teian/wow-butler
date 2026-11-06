@@ -412,6 +412,8 @@ class _KeyFieldState extends State<_KeyField> {
 
   @override
   void dispose() {
+    // Keep a typed key that was never submitted (page closed mid-edit).
+    _save();
     _controller.dispose();
     _focus.dispose();
     super.dispose();

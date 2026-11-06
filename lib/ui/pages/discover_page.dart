@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/addon.dart';
+import '../../core/models/addon_category.dart';
 import '../../core/models/wow_installation.dart';
 import '../../state/addons_controller.dart';
 import '../../state/discover_controller.dart';
@@ -66,7 +67,8 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                 Text(
                   'Durchsucht aktive Quellen für ${inst.label} '
                   '${inst.gameVersion?.split('.').take(3).join('.') ?? inst.flavor.label}'
-                  ' – GitHub-Repositories als owner/repo oder URL einfügen',
+                  ' – GitHub-Repositories als owner/repo oder URL einfügen, '
+                  'Kategorien auch als Suchbegriff (z. B. „minimap", „quests")',
                   style: WText.muted(context, size: 13),
                 ),
                 const SizedBox(height: 16),
@@ -109,6 +111,25 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                       ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _CategoryChip(
+                      label: 'Alle',
+                      selected: state.category == null,
+                      onTap: () => ctrl.setCategory(null),
+                    ),
+                    for (final c in AddonCategory.values)
+                      _CategoryChip(
+                        label: c.label,
+                        selected: state.category == c,
+                        onTap: () =>
+                            ctrl.setCategory(state.category == c ? null : c),
+                      ),
+                  ],
+                ),
                 if (problems.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   for (final p in problems)
@@ -143,7 +164,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
             child: Padding(
               padding: const EdgeInsets.all(40),
               child: Text(
-                'Keine Treffer. Suchbegriff oder Quelle anpassen.',
+                'Keine Treffer. Suchbegriff, Kategorie oder Quelle anpassen.',
                 textAlign: TextAlign.center,
                 style: WText.muted(context, size: 13),
               ),
@@ -187,6 +208,45 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = context.w;
+    return Hover(
+      onTap: onTap,
+      builder: (context, h) => AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? w.sel : (h ? w.hover : w.chip),
+          border: Border.all(
+            color: selected ? WColors.blueLight : w.border,
+          ),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? w.selFg : (h ? w.fg : w.muted),
+          ),
+        ),
+      ),
     );
   }
 }
