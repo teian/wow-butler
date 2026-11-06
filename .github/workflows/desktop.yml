@@ -38,12 +38,12 @@ jobs:
       - name: Read Flutter version
         id: flutter-version
         run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import re
-          from pathlib import Path
-          config = Path('mise.toml').read_text()
-          print('version=' + re.search(r'flutter\s*=\s*\{\s*version\s*=\s*"([^"]+)"', config).group(1))
-          PY
+          version=$(sed -n 's/^flutter *= *{ *version *= *"\([^"]*\)".*/\1/p' mise.toml)
+          if [ -z "$version" ]; then
+            echo "mise.toml is missing the flutter version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -64,7 +64,7 @@ jobs:
         run: flutter test
 
       - name: Build and package
-        run: python tool/build_desktop.py ${{ matrix.target }}
+        run: dart run tool/build_desktop.dart ${{ matrix.target }}
 
       - name: Upload app and checksum
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

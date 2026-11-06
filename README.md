@@ -43,7 +43,8 @@ Git-Backups benötigen ein installiertes `git`.
 ## Desktop-Builds
 
 Release-Builds werden auf dem jeweiligen Betriebssystem erstellt. Voraussetzungen:
-Flutter aus `mise.toml`, Python 3.9+ und die native Toolchain (`flutter doctor`).
+Flutter aus `mise.toml` und die native Toolchain (`flutter doctor`) – weitere
+Werkzeuge sind nicht nötig, das Packaging läuft in Dart mit den Projektabhängigkeiten.
 
 - **Linux:** Clang, CMake, Ninja, pkg-config und GTK-3-Entwicklungsbibliotheken.
 - **Windows:** Visual Studio 2022 mit „Desktop development with C++“ und Windows SDK.
@@ -52,13 +53,12 @@ Flutter aus `mise.toml`, Python 3.9+ und die native Toolchain (`flutter doctor`)
 Auf dem jeweiligen System im Projektordner ausführen:
 
 ```bash
-python tool/build_desktop.py linux
-python tool/build_desktop.py windows
-python tool/build_desktop.py macos
+dart run tool/build_desktop.dart linux
+dart run tool/build_desktop.dart windows
+dart run tool/build_desktop.dart macos
 ```
 
-Ohne Plattformargument wird das aktuelle Betriebssystem gewählt. Auf Systemen mit
-`python3` statt `python` entsprechend `python3 tool/build_desktop.py` verwenden.
+Ohne Plattformargument wird das aktuelle Betriebssystem gewählt.
 Mit `--skip-build` wird ein vorhandener Release-Build erneut verpackt.
 
 Die Archive und SHA-256-Prüfsummen liegen in `dist/`:
