@@ -29,18 +29,13 @@ class TitleBar extends ConsumerWidget {
             child: DragToMoveArea(
               child: Row(
                 children: [
-                  Container(
+                  Image.asset(
+                    isDark
+                        ? 'assets/icon/wow-butler-64.png'
+                        : 'assets/icon/wow-butler-light-64.png',
                     width: 20,
                     height: 20,
-                    decoration: BoxDecoration(
-                      color: WColors.orange,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(
-                      Icons.download_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    ),
+                    filterQuality: FilterQuality.medium,
                   ),
                   const SizedBox(width: 12),
                   const Text(

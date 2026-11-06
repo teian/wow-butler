@@ -126,3 +126,12 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+# Desktop integration: hicolor theme icons (dark and light variant) and the
+# launcher entry, named after APPLICATION_ID so Wayland/GNOME can associate
+# the running window with its icon.
+install(DIRECTORY
+  "${CMAKE_CURRENT_SOURCE_DIR}/../design/icon/e3-quest-frack/linux/hicolor"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons" COMPONENT Runtime)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/de.fgehann.wow_butler.desktop"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications" COMPONENT Runtime)

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=WoW Butler
+Comment=Addon-Manager für World of Warcraft
+Exec=wow-butler %U
+Icon=wow-butler
+Terminal=false
+Categories=Game;Utility;
+StartupWMClass=wow-butler
