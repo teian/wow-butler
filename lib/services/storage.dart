@@ -53,9 +53,24 @@ class Storage {
     }
   }
 
+  /// Pending write per file, so concurrent saves cannot race on the same
+  /// temp file (the loser's rename would otherwise find it gone).
+  final _pendingWrites = <String, Future<void>>{};
+
   /// Writes to a temp file and renames it, so a crash never leaves a
-  /// half-written file behind.
-  Future<void> _writeJson(String path, Object json) async {
+  /// half-written file behind. Writes to the same path are serialized in
+  /// call order.
+  Future<void> _writeJson(String path, Object json) {
+    final write = (_pendingWrites[path] ?? Future.value()).then(
+      (_) => _writeJsonNow(path, json),
+    );
+    // Keep the chain usable after a failed write; errors still reach the
+    // caller through the returned future.
+    _pendingWrites[path] = write.catchError((_) {});
+    return write;
+  }
+
+  Future<void> _writeJsonNow(String path, Object json) async {
     final file = File(path);
     await file.parent.create(recursive: true);
     final tmp = File('$path.tmp');
