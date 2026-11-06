@@ -26,6 +26,7 @@ class WowUpSource extends AddonSource {
     GameFlavor.wrath => 'wotlk',
     GameFlavor.cata => 'cata',
     GameFlavor.mists => 'mists',
+    GameFlavor.forever => 'forever',
   };
 
   @override

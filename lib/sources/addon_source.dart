@@ -1,4 +1,5 @@
 import '../core/models/addon.dart';
+import '../core/models/addon_category.dart';
 import '../core/models/addon_folder.dart';
 import '../core/models/game_flavor.dart';
 
@@ -38,6 +39,26 @@ abstract class AddonSource {
   Future<List<RemoteAddon>> featured(GameFlavor flavor);
 
   Future<List<RemoteAddon>> search(String query, GameFlavor flavor);
+
+  /// Lists addons for the discover page, optionally narrowed to [category].
+  ///
+  /// Sources without their own category taxonomy fall back to a keyword
+  /// filter over name and summary; sources that support it server side
+  /// (CurseForge) override this.
+  Future<List<RemoteAddon>> browse(
+    String query,
+    GameFlavor flavor, {
+    AddonCategory? category,
+  }) async {
+    final results = query.isEmpty
+        ? await featured(flavor)
+        : await search(query, flavor);
+    if (category == null) return results;
+    return [
+      for (final a in results)
+        if (category.matches(a)) a,
+    ];
+  }
 
   Future<RemoteAddon?> getById(String externalId, GameFlavor flavor);
 

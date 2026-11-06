@@ -33,6 +33,7 @@ class WagoSource extends AddonSource {
     GameFlavor.wrath => 'wotlk',
     GameFlavor.cata => 'cata',
     GameFlavor.mists => 'mop',
+    GameFlavor.forever => 'forever',
   };
 
   @override
@@ -105,16 +106,25 @@ class WagoSource extends AddonSource {
     }, headers: _headers) as Map<String, dynamic>;
 
     final hashes = {for (final f in candidates) f.fingerprint!.md5};
+    final wagoIdByFolder = {
+      for (final f in candidates) f.name.toLowerCase(): ?f.toc!.wagoId,
+    };
     final onDisk = {for (final f in folders) f.name.toLowerCase(): f.name};
     final matches = <AddonMatch>[];
     final seen = <String>{};
 
     for (final scan in json.objs('addons')) {
       final modules = scan.obj('modules') ?? const {};
-      final matched = modules.values.whereType<Map<String, dynamic>>().any(
-        (m) => hashes.contains(m['hash']),
-      );
       final remote = _fromScanAddon(scan);
+      // A hash match identifies the exact file; the TOC's X-Wago-ID also
+      // counts, for installs whose files Wago does not know (e.g. manual).
+      final matched =
+          modules.values.whereType<Map<String, dynamic>>().any(
+            (m) => hashes.contains(m['hash']),
+          ) ||
+          modules.keys.any(
+            (name) => wagoIdByFolder[name.toLowerCase()] == remote.externalId,
+          );
       if (!matched || !seen.add(remote.externalId)) continue;
 
       final installed = scan.obj('matched_release');
@@ -159,6 +169,7 @@ class WagoSource extends AddonSource {
       'wotlk': GameFlavor.wrath,
       'cata': GameFlavor.cata,
       'mop': GameFlavor.mists,
+      'forever': GameFlavor.forever,
     };
     final flavors = {
       for (final r in releases)

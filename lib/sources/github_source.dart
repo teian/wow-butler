@@ -36,9 +36,24 @@ class GitHubSource extends AddonSource {
     r'^(?:https?://)?(?:www\.)?(?:github\.com/)?([\w.-]+)/([\w.-]+?)(?:\.git)?(?:/.*)?$',
   );
 
-  /// Parses `owner/repo` from a repository reference, or `null`.
+  /// Project sites of addons that release on GitHub, so pasting the
+  /// website address works like pasting the repository URL.
+  static const _projectSites = <String, String>{
+    'ellesmereui.com': 'EllesmereGaming/EllesmereUI',
+  };
+
+  /// Parses `owner/repo` from a repository reference or a known project
+  /// website, or `null`.
   static String? parseRepo(String input) {
-    final m = _repoPattern.firstMatch(input.trim());
+    final trimmed = input.trim();
+    final uri = Uri.tryParse(
+      trimmed.contains('://') ? trimmed : 'https://$trimmed',
+    );
+    final host = uri?.host.toLowerCase().replaceFirst(RegExp(r'^www\.'), '');
+    final site = _projectSites[host];
+    if (site != null) return site;
+
+    final m = _repoPattern.firstMatch(trimmed);
     if (m == null) return null;
     return '${m.group(1)}/${m.group(2)}';
   }
@@ -145,6 +160,7 @@ class GitHubSource extends AddonSource {
     GameFlavor.wrath => 'wrath',
     GameFlavor.cata => 'cata',
     GameFlavor.mists => 'mists',
+    GameFlavor.forever => 'forever',
   };
 
   static final _flavorAsset = <GameFlavor, RegExp>{
@@ -156,6 +172,10 @@ class GitHubSource extends AddonSource {
     GameFlavor.wrath: RegExp(r'[-_](wrath|wotlkc)\.zip$', caseSensitive: false),
     GameFlavor.cata: RegExp(r'[-_]cata\.zip$', caseSensitive: false),
     GameFlavor.mists: RegExp(r'[-_]mists\.zip$', caseSensitive: false),
+    GameFlavor.forever: RegExp(
+      r'[-_](forever|camelot)\.zip$',
+      caseSensitive: false,
+    ),
   };
 
   Future<AddonRelease?> _pickAsset(

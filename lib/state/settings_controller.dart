@@ -18,8 +18,37 @@ final selectedInstallationProvider = Provider<WowInstallation?>(
 );
 
 class SettingsController extends Notifier<AppSettings> {
+  bool _dedupeScheduled = false;
+
   @override
-  AppSettings build() => ref.read(initialSettingsProvider);
+  AppSettings build() {
+    if (!_dedupeScheduled) {
+      _dedupeScheduled = true;
+      Future.microtask(_dedupeInstallations);
+    }
+    return ref.read(initialSettingsProvider);
+  }
+
+  /// Drops stored installations that point at the same physical client
+  /// through different routes (persisted before paths were canonicalized).
+  Future<void> _dedupeInstallations() async {
+    final s = state;
+    if (s.installations.length < 2) return;
+    final kept = await ref
+        .read(installationDetectorProvider)
+        .dedupeByPath(s.installations, preferredId: s.selectedInstallationId);
+    if (kept.length == s.installations.length) return;
+    await update(
+      (x) => AppSettings.fromJson({
+        ...x.toJson(),
+        'installations': [for (final i in kept) i.toJson()],
+        'selectedInstallationId':
+            kept.any((i) => i.id == x.selectedInstallationId)
+            ? x.selectedInstallationId
+            : kept.firstOrNull?.id,
+      }),
+    );
+  }
 
   Future<void> update(AppSettings Function(AppSettings s) change) async {
     state = change(state);

@@ -47,6 +47,7 @@ class TukuiSource extends AddonSource {
       GameFlavor.wrath => '3.',
       GameFlavor.cata => '4.',
       GameFlavor.mists => '5.',
+      GameFlavor.forever => '1.6',
       GameFlavor.retail => null,
     };
     if (prefix != null) {

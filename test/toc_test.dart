@@ -89,5 +89,41 @@ core.lua
         isNull,
       );
     });
+
+    test('picks the Camelot TOC for Forever', () {
+      expect(
+        TocSelector.select('Foo', [
+          '/a/Foo/Foo.toc',
+          '/a/Foo/Foo_Vanilla.toc',
+          '/a/Foo/Foo_Camelot.toc',
+        ], GameFlavor.forever),
+        '/a/Foo/Foo_Camelot.toc',
+      );
+    });
+
+    test('falls back to the Forever TOC for Forever', () {
+      expect(
+        TocSelector.select('Foo', [
+          '/a/Foo/Foo.toc',
+          '/a/Foo/Foo_Forever.toc',
+        ], GameFlavor.forever),
+        '/a/Foo/Foo_Forever.toc',
+      );
+    });
+  });
+
+  group('GameFlavor Forever', () {
+    test('version 1.60+ is Forever, 1.1x stays Classic Era', () {
+      expect(GameFlavor.fromVersion(1, 60), GameFlavor.forever);
+      expect(GameFlavor.fromVersion(1, 15), GameFlavor.vanilla);
+      expect(GameFlavor.fromInterface(16001), GameFlavor.forever);
+      expect(GameFlavor.fromInterface(11507), GameFlavor.vanilla);
+    });
+
+    test('the _forever_ client folder is recognized', () {
+      final type = WowClientType.fromFolderName('_forever_');
+      expect(type, WowClientType.forever);
+      expect(type!.defaultFlavor, GameFlavor.forever);
+    });
   });
 }

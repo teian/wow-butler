@@ -56,12 +56,17 @@ class InstallationDetector {
     final type = WowClientType.fromFolderName(p.basename(clientPath));
     if (type == null || !await _looksLikeClient(clientPath)) return null;
 
+    clientPath = await _canonical(clientPath);
     final root = p.dirname(clientPath);
     final product = await _readFlavorProduct(clientPath);
     final version = await _readBuildVersion(root, product);
-    final major = int.tryParse(version?.split('.').first ?? '');
+    final parts = version?.split('.');
+    final major = int.tryParse(parts?.first ?? '');
+    final minor = parts != null && parts.length > 1
+        ? int.tryParse(parts[1]) ?? 0
+        : 0;
     final flavor = major != null
-        ? GameFlavor.fromMajorVersion(major)
+        ? GameFlavor.fromVersion(major, minor)
         : type.defaultFlavor;
 
     return WowInstallation(
@@ -72,6 +77,43 @@ class InstallationDetector {
       flavor: flavor,
       gameVersion: version,
     );
+  }
+
+  /// Resolves symlinked routes to one physical path, so the same client is
+  /// not reported twice (e.g. `~/.steam/steam` → `~/.local/share/Steam`).
+  Future<String> _canonical(String path) async {
+    try {
+      return await Directory(path).resolveSymbolicLinks();
+    } on FileSystemException {
+      return p.normalize(p.absolute(path));
+    }
+  }
+
+  /// Removes stored installations that address the same physical client
+  /// through different routes (duplicates persisted before paths were
+  /// canonicalized). Within a group the entry with [preferredId] wins,
+  /// then the one whose stored path is already canonical, then the first.
+  Future<List<WowInstallation>> dedupeByPath(
+    List<WowInstallation> installations, {
+    String? preferredId,
+  }) async {
+    final byCanonical = <String, WowInstallation>{};
+    final order = <String>[];
+    for (final inst in installations) {
+      var key = await _canonical(inst.clientPath);
+      if (Platform.isWindows) key = key.toLowerCase();
+      final existing = byCanonical[key];
+      if (existing == null) {
+        byCanonical[key] = inst;
+        order.add(key);
+      } else if (inst.id == preferredId ||
+          (existing.id != preferredId &&
+              p.equals(inst.clientPath, key) &&
+              !p.equals(existing.clientPath, key))) {
+        byCanonical[key] = inst;
+      }
+    }
+    return [for (final key in order) byCanonical[key]!];
   }
 
   static String installationId(String clientPath) {

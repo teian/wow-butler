@@ -142,11 +142,13 @@ class TocSelector {
     GameFlavor.wrath: ['wrath', 'wotlkc', 'classic'],
     GameFlavor.tbc: ['tbc', 'bcc', 'classic'],
     GameFlavor.vanilla: ['vanilla', 'classic'],
+    // The Forever client accepts its internal codename and its public name.
+    GameFlavor.forever: ['camelot', 'forever'],
   };
 
   static const _allSuffixes = {
     'mainline', 'classic', 'vanilla', 'tbc', 'bcc', 'wrath', 'wotlkc', //
-    'cata', 'mists', 'standard',
+    'cata', 'mists', 'standard', 'camelot', 'forever',
   };
 
   /// Returns the TOC file name suffix (lowercase) or null for a plain TOC.

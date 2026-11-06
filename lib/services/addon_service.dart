@@ -69,6 +69,10 @@ class AddonService {
     final result = <InstalledAddon>[];
     if (!rematch) {
       for (final addon in stored) {
+        // Entries without a source are re-identified on every sync: a new
+        // key or source may be able to match them now. Their preferences
+        // survive through [previousByFolder].
+        if (!addon.isManaged) continue;
         final existing = addon.folders
             .map((f) => byName[f.toLowerCase()]?.name)
             .nonNulls
@@ -577,7 +581,7 @@ String _tocBaseName(String tocPath) => p
     .basenameWithoutExtension(tocPath)
     .replaceFirst(
       RegExp(
-        r'[-_](mainline|classic|vanilla|tbc|bcc|wrath|wotlkc|cata|mists)$',
+        r'[-_](mainline|classic|vanilla|tbc|bcc|wrath|wotlkc|cata|mists|camelot|forever)$',
         caseSensitive: false,
       ),
       '',

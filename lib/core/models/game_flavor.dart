@@ -6,15 +6,17 @@ enum GameFlavor {
   cata('Cataclysm Classic'),
   wrath('Wrath Classic'),
   tbc('TBC Classic'),
-  vanilla('Classic Era');
+  vanilla('Classic Era'),
+  forever('Forever');
 
   const GameFlavor(this.label);
 
   final String label;
 
-  /// Maps a major game version (e.g. `11` from `11.2.0.62213`) to its flavor.
-  static GameFlavor fromMajorVersion(int major) => switch (major) {
-    1 => GameFlavor.vanilla,
+  /// Maps a game version (e.g. `11.2` from `11.2.0.62213`) to its flavor.
+  /// Classic Era and Forever share major 1: Era is 1.1x, Forever 1.60+.
+  static GameFlavor fromVersion(int major, [int minor = 0]) => switch (major) {
+    1 => minor >= 60 ? GameFlavor.forever : GameFlavor.vanilla,
     2 => GameFlavor.tbc,
     3 => GameFlavor.wrath,
     4 => GameFlavor.cata,
@@ -22,9 +24,9 @@ enum GameFlavor {
     _ => GameFlavor.retail,
   };
 
-  /// Maps a TOC interface number (e.g. `110200`, `50500`, `11507`).
+  /// Maps a TOC interface number (e.g. `110200`, `50500`, `11507`, `16001`).
   static GameFlavor fromInterface(int interface) =>
-      fromMajorVersion(interface ~/ 10000);
+      fromVersion(interface ~/ 10000, (interface % 10000) ~/ 100);
 
   static GameFlavor? tryParse(String? name) =>
       GameFlavor.values.where((f) => f.name == name).firstOrNull;
@@ -41,7 +43,8 @@ enum WowClientType {
   classicBeta('_classic_beta_', 'Classic Beta', GameFlavor.mists),
   classicEra('_classic_era_', 'Classic Era', GameFlavor.vanilla),
   classicEraPtr('_classic_era_ptr_', 'Classic Era PTR', GameFlavor.vanilla),
-  anniversary('_anniversary_', 'Anniversary', GameFlavor.tbc);
+  anniversary('_anniversary_', 'Anniversary', GameFlavor.tbc),
+  forever('_forever_', 'Forever', GameFlavor.forever);
 
   const WowClientType(this.folderName, this.label, this.defaultFlavor);
 
