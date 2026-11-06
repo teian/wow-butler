@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models/addon.dart';
@@ -35,8 +37,16 @@ final navProvider = NotifierProvider<NavController, NavState>(
 );
 
 class NavController extends Notifier<NavState> {
+  /// Development aid: `WOW_BUTLER_START_VIEW=browse` opens the app on a
+  /// specific top-level page, e.g. for taking screenshots.
+  static final AppView? _startView = AppView.values
+      .where(
+        (v) => v.name == Platform.environment['WOW_BUTLER_START_VIEW'],
+      )
+      .firstOrNull;
+
   @override
-  NavState build() => const NavState();
+  NavState build() => NavState(view: _startView ?? AppView.installed);
 
   void go(AppView view) => state = NavState(view: view);
 
