@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../../core/models/addon.dart';
 import '../../core/models/app_settings.dart';
 import '../../core/models/wow_installation.dart';
+import '../../core/util/archive_extract.dart';
 import '../../core/util/file_sync.dart';
 import 'zip_backup_service.dart';
 
@@ -302,7 +303,7 @@ Future<void> _restoreTarInIsolate(
 ) => Isolate.run(() {
   final staging = Directory(p.join(clientPath, '.wow-butler-restore'));
   if (staging.existsSync()) staging.deleteSync(recursive: true);
-  extractArchiveToDiskSync(TarDecoder().decodeBytes(tar), staging.path);
+  extractArchiveSafely(TarDecoder().decodeBytes(tar), staging.path);
   try {
     final root = p.join(staging.path, slug);
     final addons = p.join(root, 'Interface', 'AddOns');

@@ -22,7 +22,7 @@ jobs:
           - target: windows
             runner: windows-2022
           - target: macos
-            runner: macos-14
+            runner: macos-26
     defaults:
       run:
         shell: bash

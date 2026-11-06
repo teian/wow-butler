@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 
 import '../../core/models/addon.dart';
 import '../../core/models/wow_installation.dart';
+import '../../core/util/archive_extract.dart';
 import '../../core/util/file_sync.dart';
 
 /// A zip archive created by [ZipBackupService].
@@ -303,7 +304,7 @@ void _restoreSync(String zipPath, String clientPath, BackupScope scope) {
   if (staging.existsSync()) staging.deleteSync(recursive: true);
   final input = InputFileStream(zipPath);
   try {
-    extractArchiveToDiskSync(ZipDecoder().decodeStream(input), staging.path);
+    extractArchiveSafely(ZipDecoder().decodeStream(input), staging.path);
   } finally {
     input.closeSync();
   }

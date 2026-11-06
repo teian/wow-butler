@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../core/models/addon.dart';
 import '../core/models/addon_folder.dart';
 import '../core/models/wow_installation.dart';
+import '../core/util/archive_extract.dart';
 import '../core/util/ids.dart';
 import '../sources/addon_source.dart';
 import '../sources/api_client.dart';
@@ -516,7 +517,7 @@ List<String> extractAddonArchive(String zipPath, String outDir) {
   final input = InputFileStream(zipPath);
   try {
     final archive = ZipDecoder().decodeStream(input);
-    extractArchiveToDiskSync(archive, outDir);
+    extractArchiveSafely(archive, outDir);
   } finally {
     input.closeSync();
   }
