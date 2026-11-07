@@ -50,7 +50,8 @@ kommen pro Plattform Paketierungswerkzeuge hinzu.
 - **Linux:** Clang, CMake, Ninja, pkg-config und GTK-3-Entwicklungsbibliotheken;
   für die Pakete [nfpm](https://nfpm.goreleaser.com), das `mise install` mitinstalliert.
 - **Windows:** Visual Studio 2022 mit „Desktop development with C++“ und Windows SDK;
-  für den Installer das [WiX Toolset v5](https://wixtoolset.org) (`dotnet tool install --global wix --version 5.0.2`).
+  für die Installer [Inno Setup 6](https://jrsoftware.org/isinfo.php) und das
+  [WiX Toolset v5](https://wixtoolset.org) (`dotnet tool install --global wix --version 5.0.2`).
 - **macOS:** Xcode und seine Command Line Tools; CocoaPods für Plugins, die es benötigen.
   Das DMG erstellt das mitgelieferte `hdiutil`.
 
@@ -66,7 +67,7 @@ Ohne Plattformargument wird das aktuelle Betriebssystem gewählt.
 Mit `--skip-build` wird ein vorhandener Release-Build erneut verpackt,
 mit `--archive-only` entstehen nur die portablen Archive ohne Installer.
 Werkzeuge, die nicht im `PATH` liegen, lassen sich über die Umgebungsvariablen
-`NFPM` und `WIX` angeben.
+`NFPM`, `ISCC` und `WIX` angeben.
 
 Pakete, Installer und ihre SHA-256-Prüfsummen liegen in `dist/`:
 
@@ -76,7 +77,8 @@ Pakete, Installer und ihre SHA-256-Prüfsummen liegen in `dist/`:
 | Fedora | `wow-butler-<version>-<build>.<arch>.rpm` | `sudo dnf install ./<datei>.rpm` |
 | Arch Linux | `wow-butler-<version>-<build>-<arch>.pkg.tar.zst` | `sudo pacman -U <datei>.pkg.tar.zst` |
 | Linux (portabel) | `wow-butler-<version>-linux-<arch>.tar.gz` | entpacken, `wow-butler/wow_butler` starten |
-| Windows | `wow-butler-<version>-windows-<arch>.msi` | Doppelklick oder `msiexec /i <datei>.msi`; installiert für alle Benutzer |
+| Windows | `wow-butler-<version>-windows-<arch>-setup.exe` | Setup; pro Benutzer oder für alle Benutzer |
+| Windows | `wow-butler-<version>-windows-<arch>.msi` | MSI für alle Benutzer, z. B. für Softwareverteilung |
 | Windows (portabel) | `wow-butler-<version>-windows-<arch>.zip` | entpacken, `wow-butler/wow_butler.exe` starten |
 | macOS | `wow-butler-<version>-macos-<arch>.dmg` | `wow_butler.app` auf „Programme“ ziehen |
 | macOS | `wow-butler-<version>-macos-<arch>.zip` | `wow_butler.app` in „Programme“ verschieben |
