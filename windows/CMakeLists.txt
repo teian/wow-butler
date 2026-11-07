@@ -53,6 +53,13 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 add_subdirectory("runner")
 
 
+# The app targets desktop only, but path_provider always pulls in its
+# Android implementation and with it the jni FFI plugin. jni's CMake build
+# links against any JDK it finds, leaving a bundled library that needs
+# jvm.dll. Keep it from looking, so builds are the same with or without a
+# JDK installed; jni then builds nothing.
+set(CMAKE_DISABLE_FIND_PACKAGE_JNI ON)
+
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
