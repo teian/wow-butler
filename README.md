@@ -48,7 +48,7 @@ und Prüfsummen entstehen in Dart mit den Projektabhängigkeiten; für die Insta
 kommen pro Plattform Paketierungswerkzeuge hinzu.
 
 - **Linux:** Clang, CMake, Ninja, pkg-config und GTK-3-Entwicklungsbibliotheken;
-  für die Pakete [nfpm](https://nfpm.goreleaser.com).
+  für die Pakete [nfpm](https://nfpm.goreleaser.com), das `mise install` mitinstalliert.
 - **Windows:** Visual Studio 2022 mit „Desktop development with C++“ und Windows SDK;
   für die Installer [Inno Setup 6](https://jrsoftware.org/isinfo.php) und das
   [WiX Toolset v5](https://wixtoolset.org) (`dotnet tool install --global wix --version 5.0.2`).
