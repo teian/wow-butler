@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/external_addons.dart';
 import '../../core/models/addon.dart';
 import '../../core/models/game_flavor.dart';
 import '../../core/models/wow_installation.dart';
@@ -97,7 +98,7 @@ class AddonDetailPage extends ConsumerWidget {
                           ),
                           const SizedBox(width: 10),
                         ],
-                        SourceBadge(addon.source),
+                        SourceBadge(addon.source, external: addon.external),
                         const SizedBox(width: 10),
                         status,
                       ],
@@ -108,12 +109,19 @@ class AddonDetailPage extends ConsumerWidget {
               if (addon.websiteUrl != null) ...[
                 const SizedBox(width: 16),
                 WButton(
-                  label: 'Auf ${addon.source?.label ?? 'Website'} öffnen',
+                  kind: addon.updateNeedsWebsite
+                      ? WButtonKind.primary
+                      : WButtonKind.outline,
+                  label: addon.updateNeedsWebsite
+                      ? 'Update auf ${addon.source?.label ?? 'Website'} laden'
+                      : 'Auf ${addon.source?.label ?? 'Website'} öffnen',
                   icon: Icons.open_in_new_rounded,
                   onPressed: () => openUrl(addon.websiteUrl),
                 ),
               ],
-              if (addon.hasUpdate && queued == null) ...[
+              if (addon.hasUpdate &&
+                  !addon.updateNeedsWebsite &&
+                  queued == null) ...[
                 const SizedBox(width: 8),
                 WButton(
                   kind: WButtonKind.primary,
@@ -748,6 +756,14 @@ class _Manage extends ConsumerWidget {
                   hint: 'Bleibt auf ${_short(addon.installedVersion ?? '—')}',
                   value: addon.pinned,
                   onChanged: (v) => ctrl.setPinned([addon.id], v),
+                ),
+              if (!addon.isManaged &&
+                  !isKnownExternalAddon(addon.folders.first))
+                _ToggleRow(
+                  label: 'Extern verwaltet',
+                  hint: 'Nur per Abo oder externer Software erhältlich',
+                  value: addon.external,
+                  onChanged: (v) => ctrl.setExternal([addon.id], v),
                 ),
               _ToggleRow(
                 label: 'Ignorieren',

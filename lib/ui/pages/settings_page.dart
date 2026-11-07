@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_version.dart';
 import '../../core/models/addon.dart';
 import '../../core/models/app_settings.dart';
 import '../../core/models/wow_installation.dart';
@@ -47,7 +48,7 @@ class SettingsPage extends StatelessWidget {
               const _SystemCard(),
               const SizedBox(height: 20),
               Text(
-                'WoW Butler 1.0.0 · Flutter · ${Platform.operatingSystem}-${_arch()}',
+                'WoW Butler $appVersionLabel · Flutter · ${Platform.operatingSystem}-${_arch()}',
                 style: WText.mono(context),
               ),
             ],
@@ -237,6 +238,18 @@ class _UpdatesCard extends ConsumerWidget {
           ),
         ),
         SettingRow(
+          label: 'Parallele Downloads',
+          hint: 'Wie viele Addons gleichzeitig geladen werden',
+          trailing: WSegmented<int>(
+            options: [for (final n in _parallelOptions) (n, '$n')],
+            value: _parallelOptions.contains(s.parallelDownloads)
+                ? s.parallelDownloads
+                : AppSettings.defaultParallelDownloads,
+            onChanged: (v) =>
+                _ctrl(ref).update((x) => x.copyWith(parallelDownloads: v)),
+          ),
+        ),
+        SettingRow(
           label: 'Standard-Kanal',
           hint: 'Pro Addon in der Detailansicht überschreibbar',
           trailing: WSegmented<ReleaseChannel>(
@@ -264,13 +277,23 @@ class _SourcesCard extends ConsumerWidget {
 
     String hint(AddonSourceId id) => switch (id) {
       AddonSourceId.curseforge => 'Eigener API-Key von console.curseforge.com',
-      AddonSourceId.wago => 'Wago-API-Key für Addons',
+      AddonSourceId.wago => 'Wago-API-Key, für Abonnenten von Wago',
       AddonSourceId.wowup => 'GitHub-Addons aus dem WowUp Hub',
       AddonSourceId.tukui => 'ElvUI und Tukui direkt von tukui.org',
       AddonSourceId.wowinterface =>
         'Addons von wowinterface.com über die Minion-API',
       AddonSourceId.github =>
         'Releases aus Repositories, Token hebt das Rate-Limit',
+    };
+
+    Widget? keyHelp(AddonSourceId id) => switch (_keyHelp[id]) {
+      (final url, final steps) => WIconButton(
+        icon: Icons.help_outline_rounded,
+        iconSize: 16,
+        tooltip: '$steps\n\nKlicken öffnet $url',
+        onPressed: () => openUrl(url),
+      ),
+      null => null,
     };
 
     Widget? keyField(AddonSourceId id) => switch (id) {
@@ -286,7 +309,7 @@ class _SourcesCard extends ConsumerWidget {
         onSaved: (v) => _ctrl(ref).update((x) => x.copyWith(wagoApiKey: v)),
       ),
       AddonSourceId.github => _KeyField(
-        hint: 'ghp_… (optional)',
+        hint: 'github_pat_… (optional)',
         value: s.githubToken,
         onSaved: (v) => _ctrl(ref).update((x) => x.copyWith(githubToken: v)),
       ),
@@ -355,6 +378,10 @@ class _SourcesCard extends ConsumerWidget {
                       const SizedBox(width: 14),
                       SizedBox(width: 200, child: field),
                     ],
+                    if (keyHelp(id) case final help?) ...[
+                      const SizedBox(width: 4),
+                      help,
+                    ],
                     const SizedBox(width: 14),
                     WToggle(
                       value: s.isSourceEnabled(id),
@@ -375,6 +402,41 @@ class _SourcesCard extends ConsumerWidget {
     );
   }
 }
+
+const _parallelOptions = [1, 2, 3, 5, 8, 10];
+
+/// Where to get each source's API key, and how. Mirrors the README section
+/// "API-Schlüssel".
+const _keyHelp = <AddonSourceId, (String, String)>{
+  AddonSourceId.curseforge: (
+    'https://console.curseforge.com/',
+    'CurseForge-API-Key (kostenlos):\n'
+        '1. Auf console.curseforge.com anmelden bzw. registrieren.\n'
+        '2. Im Menü „API keys“ öffnen und den Schlüssel kopieren.\n'
+        'Er beginnt mit \$2a\$10\$. Ein Autoren-Token '
+        '(Format 1234abcd-…) funktioniert nicht.',
+  ),
+  AddonSourceId.wago: (
+    'https://addons.wago.io/account/apikeys',
+    'Wago-API-Key:\n'
+        '1. Auf addons.wago.io mit dem Wago-Konto anmelden.\n'
+        '2. Unter „API Keys“ (addons.wago.io/account/apikeys) einen '
+        'Schlüssel erzeugen und kopieren.\n'
+        'Wago stellt die Schlüssel für Abonnenten (Patreon) bereit. '
+        'Ohne Schlüssel bleibt Wago deaktiviert, die anderen Quellen '
+        'funktionieren weiter.',
+  ),
+  AddonSourceId.github: (
+    'https://github.com/settings/personal-access-tokens/new',
+    'GitHub-Token (optional):\n'
+        'Ohne Token erlaubt GitHub 60 Anfragen pro Stunde, mit Token 5.000.\n'
+        '1. Auf github.com unter Settings → Developer settings → '
+        'Personal access tokens einen „Fine-grained token“ anlegen.\n'
+        '2. Repository access: „Public repositories“, keine weiteren '
+        'Berechtigungen nötig.\n'
+        '3. Den Token (beginnt mit github_pat_) kopieren.',
+  ),
+};
 
 /// Input that saves when submitted or when focus leaves, so the sources are
 /// not rebuilt on every keystroke.

@@ -15,7 +15,7 @@ Addon-Manager für World of Warcraft (Flutter, Linux/Windows/macOS) mit dem Funk
 - **Quellen:** CurseForge, Wago, WowUp Hub, TukUI (ElvUI/Tukui direkt), WoWInterface und GitHub-Releases, parallel durchsucht. Die Priorität beim Zuordnen ist einstellbar.
 - **Erkennung installierter Addons:** über die Folder-Fingerprints von WowUp (Murmur2 für CurseForge, MD5 für Wago/WowUp Hub), TOC-IDs (`X-Curse-Project-ID`, `X-Wago-ID`, `X-WoWI-ID`) und TukUI-Metadaten. Nicht zugeordnete Addons lassen sich nachträglich manuell einer Quelle zuordnen.
 - **Clients:** Retail, PTR/Beta, Classic (Mists), Classic Era, Anniversary und WoW Forever. Die Spielversion wird aus `.build.info` gelesen. Unter Linux werden Wine-, Lutris-, Bottles- und Steam-Proton-Prefixe automatisch gefunden.
-- **Updates:** Kanäle Stable/Beta/Alpha pro Addon, Pinnen, Ignorieren, Auto-Update, Update-Warteschlange und Abhängigkeiten (CurseForge).
+- **Updates:** Kanäle Stable/Beta/Alpha pro Addon, Pinnen, Ignorieren, Auto-Update, Update-Warteschlange mit parallelen Downloads (Standard 5, einstellbar) und Abhängigkeiten (CurseForge).
 - **Backups:**
   - ZIP-Archive in einen frei wählbaren Ordner, periodisch mit Aufbewahrung. Ein neues Archiv entsteht nur, wenn sich die Daten geändert haben.
   - Vor Updates wird der WTF-Ordner gesichert.
@@ -23,11 +23,35 @@ Addon-Manager für World of Warcraft (Flutter, Linux/Windows/macOS) mit dem Funk
 
 ## API-Schlüssel
 
-CurseForge und Wago brauchen eigene Schlüssel. Sie werden unter **Einstellungen → Quellen** eingetragen.
+CurseForge und Wago brauchen eigene Schlüssel, für GitHub ist ein Token optional.
+Eingetragen werden sie unter **Einstellungen → Quellen**. Das **?**-Symbol neben dem
+Feld zeigt die Schritte und öffnet per Klick die passende Seite. Ohne Schlüssel bleibt
+die jeweilige Quelle inaktiv; die übrigen Quellen funktionieren weiter.
 
-- **CurseForge:** Schlüssel von https://console.curseforge.com
-- **Wago:** Access-Key für Abonnenten
-- **GitHub:** Ein Token ist optional und hebt das Rate-Limit an.
+### CurseForge (kostenlos)
+
+1. Auf https://console.curseforge.com anmelden bzw. registrieren.
+2. Im Menü **API keys** den Schlüssel kopieren. Er beginnt mit `$2a$10$`.
+
+Ein Autoren-Token (Format `1234abcd-…`) ist kein API-Key und funktioniert nicht.
+
+### Wago
+
+1. Auf https://addons.wago.io mit dem Wago-Konto anmelden.
+2. Unter https://addons.wago.io/account/apikeys einen Schlüssel erzeugen und kopieren.
+
+Wago stellt die Schlüssel für Abonnenten (Patreon) bereit.
+
+### GitHub (optional)
+
+Ohne Token erlaubt GitHub 60 Anfragen pro Stunde, mit Token 5.000.
+
+1. Unter https://github.com/settings/personal-access-tokens/new
+   (Settings → Developer settings → Personal access tokens) einen
+   *Fine-grained token* anlegen.
+2. Bei **Repository access** „Public repositories“ wählen; weitere Berechtigungen
+   sind nicht nötig.
+3. Den Token (beginnt mit `github_pat_`) kopieren.
 
 ## Entwicklung
 

@@ -1,9 +1,12 @@
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
+
 import '../core/models/addon.dart';
 import '../core/models/addon_folder.dart';
 import '../core/models/game_flavor.dart';
 import '../core/models/wow_installation.dart';
+import '../core/toc/toc_file.dart';
 import 'addon_source.dart';
 import 'api_client.dart';
 import 'description.dart';
@@ -24,8 +27,9 @@ class GitHubSource extends AddonSource {
   @override
   bool get supportsTextSearch => false;
 
+  /// Matching only recognizes the folders in [_knownRepos].
   @override
-  bool get supportsMatching => false;
+  bool get supportsMatching => true;
 
   Map<String, String> get _headers => {
     'Accept': 'application/vnd.github+json',
@@ -41,6 +45,10 @@ class GitHubSource extends AddonSource {
   static const _projectSites = <String, String>{
     'ellesmereui.com': 'EllesmereGaming/EllesmereUI',
   };
+
+  /// AddOns folders (lower case) of addons that release only on GitHub and
+  /// carry no TOC hint, so syncing can still identify them.
+  static const _knownRepos = <String, String>{'questiedb': 'Questie/QuestieDB'};
 
   /// Parses `owner/repo` from a repository reference or a known project
   /// website, or `null`.
@@ -129,7 +137,41 @@ class GitHubSource extends AddonSource {
   Future<List<AddonMatch>> match(
     List<AddonFolder> folders,
     GameFlavor flavor,
-  ) async => const [];
+  ) async {
+    final matches = <AddonMatch>[];
+    for (final folder in folders) {
+      final toc = folder.toc;
+      final repo = _knownRepos[folder.name.toLowerCase()];
+      if (toc == null || repo == null) continue;
+      final addon = await getById(repo, flavor);
+      // Without a release for this game version the repository cannot
+      // update the addon; leave the folder to other sources.
+      if (addon == null || addon.releases.isEmpty) continue;
+      matches.add(
+        AddonMatch(
+          addon: addon,
+          folders: [folder.name],
+          installedRelease: installedRelease(toc, addon.releases, flavor),
+        ),
+      );
+    }
+    return matches;
+  }
+
+  /// The release among [releases] that matches the TOC version. A build
+  /// for another game version (`## X-Flavor: Cata` on Forever) counts as
+  /// unknown, so the next update replaces it with the right one.
+  static AddonRelease? installedRelease(
+    TocFile toc,
+    List<AddonRelease> releases,
+    GameFlavor flavor,
+  ) {
+    if (toc.builtForOtherFlavor(flavor)) return null;
+    String norm(String v) => v.trim().replaceFirst(RegExp(r'^[vV]'), '');
+    final version = toc.version;
+    if (version == null) return null;
+    return releases.where((r) => norm(r.version) == norm(version)).firstOrNull;
+  }
 
   @override
   Future<AddonDetails> details(RemoteAddon addon, GameFlavor flavor) async {

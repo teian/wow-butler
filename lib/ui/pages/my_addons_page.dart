@@ -11,7 +11,7 @@ import '../format.dart';
 import '../tokens.dart';
 import '../widgets/primitives.dart';
 
-enum _Filter { all, updates, pinned, ignored }
+enum _Filter { all, updates, pinned, ignored, external, websiteOnly }
 
 /// Column layout of the addon table (28px | 2.4fr | 1.6fr | 104 | 72 | 104 | 118).
 class _Cols {
@@ -72,12 +72,18 @@ class _MyAddonsPageState extends ConsumerState<MyAddonsPage> {
     super.dispose();
   }
 
+  static bool _isExternal(InstalledAddon a) => !a.isManaged && a.external;
+
+  static const _optionalFilters = {_Filter.external, _Filter.websiteOnly};
+
   bool _matches(InstalledAddon a) {
     final ok = switch (_filter) {
       _Filter.all => true,
       _Filter.updates => a.hasUpdate,
       _Filter.pinned => a.pinned,
       _Filter.ignored => a.ignored,
+      _Filter.external => _isExternal(a),
+      _Filter.websiteOnly => a.isManaged && !a.downloadsAllowed,
     };
     if (!ok) return false;
     final q = _search.text.trim().toLowerCase();
@@ -104,11 +110,16 @@ class _MyAddonsPageState extends ConsumerState<MyAddonsPage> {
     _selected.removeWhere((id) => !addons.any((a) => a.id == id));
     final visible = addons.where(_matches).toList();
     final updates = state.updatable.length;
+    final websiteOnly = addons
+        .where((a) => a.isManaged && !a.downloadsAllowed)
+        .length;
     final counts = {
       _Filter.all: addons.length,
       _Filter.updates: updates,
       _Filter.pinned: addons.where((a) => a.pinned).length,
       _Filter.ignored: addons.where((a) => a.ignored).length,
+      _Filter.external: addons.where(_isExternal).length,
+      _Filter.websiteOnly: websiteOnly,
     };
     final allChecked =
         visible.isNotEmpty && visible.every((a) => _selected.contains(a.id));
@@ -161,6 +172,13 @@ class _MyAddonsPageState extends ConsumerState<MyAddonsPage> {
                     ),
                   ],
                 ),
+                if (websiteOnly > 0) ...[
+                  const SizedBox(height: 16),
+                  _WebsiteOnlyNotice(
+                    count: websiteOnly,
+                    onShow: () => setState(() => _filter = _Filter.websiteOnly),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 SizedBox(
                   height: 36,
@@ -177,20 +195,26 @@ class _MyAddonsPageState extends ConsumerState<MyAddonsPage> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            for (final f in _Filter.values) ...[
-                              _FilterPill(
-                                label: switch (f) {
-                                  _Filter.all => 'Alle',
-                                  _Filter.updates => 'Updates',
-                                  _Filter.pinned => 'Gepinnt',
-                                  _Filter.ignored => 'Ignoriert',
-                                },
-                                count: counts[f]!,
-                                active: _filter == f,
-                                onTap: () => setState(() => _filter = f),
-                              ),
-                              const SizedBox(width: 4),
-                            ],
+                            for (final f in _Filter.values)
+                              // Niche filters only appear when they apply.
+                              if (counts[f]! > 0 ||
+                                  _filter == f ||
+                                  !_optionalFilters.contains(f)) ...[
+                                _FilterPill(
+                                  label: switch (f) {
+                                    _Filter.all => 'Alle',
+                                    _Filter.updates => 'Updates',
+                                    _Filter.pinned => 'Gepinnt',
+                                    _Filter.ignored => 'Ignoriert',
+                                    _Filter.external => 'Extern',
+                                    _Filter.websiteOnly => 'Nur Website',
+                                  },
+                                  count: counts[f]!,
+                                  active: _filter == f,
+                                  onTap: () => setState(() => _filter = f),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
                           ],
                         )
                       : _BatchBar(
@@ -335,6 +359,23 @@ class _MyAddonsPageState extends ConsumerState<MyAddonsPage> {
       ],
     );
   }
+}
+
+/// Explains why some addons can only be updated from their website.
+class _WebsiteOnlyNotice extends StatelessWidget {
+  const _WebsiteOnlyNotice({required this.count, required this.onShow});
+
+  final int count;
+  final VoidCallback onShow;
+
+  @override
+  Widget build(BuildContext context) => WNotice(
+    '${count == 1 ? 'Ein Addon gibt' : '$count Addons gibt'} es nur über die '
+    'Website: Die Autoren erlauben keine Downloads über '
+    'Drittanbieter-Programme, und keine andere Quelle führt sie. Updates '
+    'werden angezeigt, die Installation erfolgt über „Website“.',
+    action: WButton(label: 'Anzeigen', small: true, onPressed: onShow),
+  );
 }
 
 class _FilterPill extends StatelessWidget {
@@ -548,7 +589,7 @@ class _AddonRow extends ConsumerWidget {
                 ),
             ],
           ),
-          SourceBadge(addon.source),
+          SourceBadge(addon.source, external: addon.external),
           Text(
             gameVersionOf(addon, inst),
             maxLines: 1,
@@ -577,6 +618,15 @@ class _AddonRow extends ConsumerWidget {
             ),
           ),
         ],
+      );
+    }
+    if (addon.updateNeedsWebsite) {
+      return WButton(
+        label: 'Website',
+        icon: Icons.open_in_new_rounded,
+        kind: WButtonKind.outlineBlue,
+        small: true,
+        onPressed: () => openUrl(addon.websiteUrl),
       );
     }
     if (addon.hasUpdate) {

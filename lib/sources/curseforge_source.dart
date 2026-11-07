@@ -1,10 +1,12 @@
 import 'package:collection/collection.dart';
 
+import '../core/external_addons.dart';
 import '../core/models/addon.dart';
 import '../core/models/addon_category.dart';
 import '../core/models/addon_folder.dart';
 import '../core/models/game_flavor.dart';
 import '../core/models/wow_installation.dart';
+import '../core/util/version_label.dart';
 import 'addon_source.dart';
 import 'api_client.dart';
 import 'description.dart';
@@ -196,6 +198,7 @@ class CurseForgeSource extends AddonSource {
     matches.addAll(
       await _matchByTocId(folders, flavor, matches, byMod.keys.toSet()),
     );
+    matches.addAll(await _matchByName(folders, flavor, matches));
     return matches;
   }
 
@@ -227,47 +230,149 @@ class CurseForgeSource extends AddonSource {
             }, headers: _headers)
             as Map<String, dynamic>;
 
-    final typeId = gameVersionTypeId(flavor);
+    final onDisk = {for (final f in folders) f.name.toLowerCase(): f.name};
+    return [
+      for (final mod in json.objs('data'))
+        if (byProject[mod.integer('id')] case final declaring?)
+          _matchFromMod(mod, declaring, onDisk, flavor),
+    ];
+  }
+
+  /// AddOns folders (lower case) of CurseForge projects whose TOC carries
+  /// neither a project ID nor the CurseForge author name, mapped to the
+  /// project slug.
+  static const _knownSlugs = <String, String>{'questiedb': 'questiedb'};
+
+  /// Last resort for folders without fingerprint or TOC ID match, e.g. a
+  /// local build of an addon that is also on CurseForge. Known folders are
+  /// looked up by their project slug. Others search the TOC title and only
+  /// accept a project whose release ships a folder of the same name and
+  /// whose authors include the TOC author.
+  Future<List<AddonMatch>> _matchByName(
+    List<AddonFolder> folders,
+    GameFlavor flavor,
+    List<AddonMatch> matched,
+  ) async {
+    final claimed = {
+      for (final m in matched)
+        for (final f in m.folders) f.toLowerCase(),
+    };
+    final claimedMods = {for (final m in matched) m.addon.externalId};
+    final candidates = folders
+        .where(
+          (f) =>
+              f.hasToc &&
+              !claimed.contains(f.name.toLowerCase()) &&
+              (_knownSlugs.containsKey(f.name.toLowerCase()) ||
+                  (f.toc!.author?.isNotEmpty ?? false)) &&
+              !f.toc!.isLoadOnDemand &&
+              !isKnownExternalAddon(f.name),
+        )
+        .take(_maxNameSearches);
+
     final onDisk = {for (final f in folders) f.name.toLowerCase(): f.name};
     final matches = <AddonMatch>[];
-    for (final mod in json.objs('data')) {
-      final declaring = byProject[mod.integer('id')];
-      if (declaring == null) continue;
-      final files =
-          mod
-              .objs('latestFiles')
-              .where((f) => f['exposeAsAlternative'] != true)
-              .where((f) => _isCompatible(f, typeId))
-              .toList()
-            ..sort((a, b) => (b.integer('id') ?? 0) - (a.integer('id') ?? 0));
-
-      // The installed version is known from the TOC, not from a fingerprint.
-      final tocVersion = declaring.first.toc?.version?.replaceFirst(
-        RegExp(r'^[vV]'),
-        '',
+    for (final folder in candidates) {
+      if (claimed.contains(folder.name.toLowerCase())) continue;
+      final toc = folder.toc!;
+      final slug = _knownSlugs[folder.name.toLowerCase()];
+      final uri = Uri.parse('$_base/v1/mods/search').replace(
+        queryParameters: {
+          'gameId': '$_gameId',
+          if (slug != null) 'slug': slug else 'searchFilter': toc.title,
+          'gameVersionTypeId': '${gameVersionTypeId(flavor)}',
+          'pageSize': '20',
+        },
       );
-      final installedFile = files.firstWhereOrNull(
-        (f) =>
-            tocVersion != null &&
-            (f.str('displayName') ?? '').replaceFirst(RegExp(r'^[vV]'), '') ==
-                tocVersion,
-      );
-
-      matches.add(
-        AddonMatch(
-          addon: _toRemote(mod, flavor),
-          folders: {
-            for (final f in declaring) f.name,
-            for (final module in files.firstOrNull?.objs('modules') ?? const [])
-              ?onDisk[(module['name'] as String? ?? '').toLowerCase()],
-          }.toList(),
-          installedRelease: installedFile == null
-              ? null
-              : _toRelease(installedFile),
-        ),
-      );
+      final Map json;
+      try {
+        json = await _api.getJson(uri, headers: _headers) as Map;
+      } on Object {
+        // A failed search must not discard the fingerprint matches.
+        continue;
+      }
+      final author = toc.author?.toLowerCase();
+      final mod = ((json['data'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .where((m) {
+            if (claimedMods.contains('${m['id']}')) return false;
+            if (slug != null) return m['slug'] == slug;
+            final byAuthor = m
+                .objs('authors')
+                .any((a) => (a.str('name') ?? '').toLowerCase() == author);
+            final shipsFolder = m
+                .objs('latestFiles')
+                .any(
+                  (f) => f
+                      .objs('modules')
+                      .any(
+                        (mod) =>
+                            (mod.str('name') ?? '').toLowerCase() ==
+                            folder.name.toLowerCase(),
+                      ),
+                );
+            return byAuthor && shipsFolder;
+          })
+          .firstOrNull;
+      if (mod == null) continue;
+      final match = _matchFromMod(mod, [folder], onDisk, flavor);
+      matches.add(match);
+      claimed.addAll(match.folders.map((f) => f.toLowerCase()));
+      claimedMods.add(match.addon.externalId);
     }
     return matches;
+  }
+
+  /// Name searches per sync; folders that stay local are searched again on
+  /// every sync, so this bounds the cost of large local collections.
+  static const _maxNameSearches = 25;
+
+  /// A match for [mod], owned by the [declaring] folders plus the modules of
+  /// its newest compatible release that exist on disk.
+  AddonMatch _matchFromMod(
+    Map<String, dynamic> mod,
+    List<AddonFolder> declaring,
+    Map<String, String> onDisk,
+    GameFlavor flavor,
+  ) {
+    final typeId = gameVersionTypeId(flavor);
+    final files =
+        mod
+            .objs('latestFiles')
+            .where((f) => f['exposeAsAlternative'] != true)
+            .where((f) => _isCompatible(f, typeId))
+            .toList()
+          ..sort((a, b) => (b.integer('id') ?? 0) - (a.integer('id') ?? 0));
+
+    // The installed version is known from the TOC, not from a fingerprint.
+    // A build for another game version counts as unknown, so the next
+    // update installs the right one.
+    final toc = declaring.first.toc;
+    final tocVersion = (toc?.builtForOtherFlavor(flavor) ?? true)
+        ? null
+        : toc?.version?.replaceFirst(
+      RegExp(r'^[vV]'),
+      '',
+    );
+    final installedFile = files.firstWhereOrNull(
+      (f) =>
+          tocVersion != null &&
+          versionLabel(f.str('displayName') ?? '')
+                  .replaceFirst(RegExp(r'^[vV]'), '') ==
+              tocVersion,
+    );
+
+    return AddonMatch(
+      addon: _toRemote(mod, flavor),
+      folders: {
+        for (final f in declaring) f.name,
+        for (final module in files.firstOrNull?.objs('modules') ?? const [])
+          ?onDisk[(module['name'] as String? ?? '').toLowerCase()],
+      }.toList(),
+      installedRelease: installedFile == null
+          ? null
+          : _toRelease(installedFile),
+    );
   }
 
   @override
@@ -331,6 +436,7 @@ class CurseForgeSource extends AddonSource {
         .where((f) => f['exposeAsAlternative'] != true)
         .where((f) => _isCompatible(f, typeId))
         .toList();
+    final releases = [for (final f in files) ?_toRelease(f)];
     return RemoteAddon(
       source: id,
       externalId: '${m['id']}',
@@ -341,7 +447,13 @@ class CurseForgeSource extends AddonSource {
       websiteUrl: m.obj('links')?.str('websiteUrl'),
       downloadCount: m.integer('downloadCount'),
       updatedAt: m.date('dateReleased') ?? m.date('dateModified'),
-      releases: [for (final f in files) ?_toRelease(f)],
+      releases: releases,
+      // Older API responses lack the flag; files without a download URL
+      // tell the same.
+      downloadsAllowed:
+          m['allowModDistribution'] != false &&
+          !(releases.isNotEmpty &&
+              releases.every((r) => r.downloadUrl.isEmpty)),
     );
   }
 
@@ -354,7 +466,7 @@ class CurseForgeSource extends AddonSource {
     final url = f.str('downloadUrl') ?? '';
     return AddonRelease(
       id: '$fileId',
-      version: f.str('displayName') ?? fileName,
+      version: versionLabel(f.str('displayName') ?? fileName),
       channel: switch (f['releaseType']) {
         2 => ReleaseChannel.beta,
         3 => ReleaseChannel.alpha,

@@ -157,6 +157,7 @@ class AppSettings {
     this.wagoApiKey,
     this.githubToken,
     this.updateCheckMinutes = 360,
+    this.parallelDownloads = defaultParallelDownloads,
     this.autoUpdate = true,
     this.checkOnStart = true,
     this.defaultChannel = ReleaseChannel.stable,
@@ -188,6 +189,11 @@ class AppSettings {
   /// 0 disables background update checks.
   final int updateCheckMinutes;
 
+  /// How many addon downloads (installs and updates) run at the same time.
+  final int parallelDownloads;
+
+  static const defaultParallelDownloads = 5;
+
   /// Install updates automatically (at start and on every check). Pinned,
   /// ignored and opted-out addons are left alone.
   final bool autoUpdate;
@@ -218,6 +224,7 @@ class AppSettings {
     String? wagoApiKey,
     String? githubToken,
     int? updateCheckMinutes,
+    int? parallelDownloads,
     bool? autoUpdate,
     bool? checkOnStart,
     ReleaseChannel? defaultChannel,
@@ -235,6 +242,7 @@ class AppSettings {
     wagoApiKey: wagoApiKey ?? this.wagoApiKey,
     githubToken: githubToken ?? this.githubToken,
     updateCheckMinutes: updateCheckMinutes ?? this.updateCheckMinutes,
+    parallelDownloads: parallelDownloads ?? this.parallelDownloads,
     autoUpdate: autoUpdate ?? this.autoUpdate,
     checkOnStart: checkOnStart ?? this.checkOnStart,
     defaultChannel: defaultChannel ?? this.defaultChannel,
@@ -253,6 +261,7 @@ class AppSettings {
     'wagoApiKey': wagoApiKey,
     'githubToken': githubToken,
     'updateCheckMinutes': updateCheckMinutes,
+    'parallelDownloads': parallelDownloads,
     'autoUpdate': autoUpdate,
     'checkOnStart': checkOnStart,
     'defaultChannel': defaultChannel.name,
@@ -290,6 +299,10 @@ class AppSettings {
       wagoApiKey: json['wagoApiKey'] as String?,
       githubToken: json['githubToken'] as String?,
       updateCheckMinutes: json['updateCheckMinutes'] as int? ?? 360,
+      parallelDownloads: switch (json['parallelDownloads']) {
+        final int n when n >= 1 => n,
+        _ => defaultParallelDownloads,
+      },
       autoUpdate: json['autoUpdate'] as bool? ?? true,
       checkOnStart: json['checkOnStart'] as bool? ?? true,
       defaultChannel:
