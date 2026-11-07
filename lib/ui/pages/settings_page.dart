@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_version.dart';
 import '../../core/models/addon.dart';
 import '../../core/models/app_settings.dart';
 import '../../core/models/wow_installation.dart';
@@ -47,7 +48,7 @@ class SettingsPage extends StatelessWidget {
               const _SystemCard(),
               const SizedBox(height: 20),
               Text(
-                'WoW Butler 1.1.0 · Flutter · ${Platform.operatingSystem}-${_arch()}',
+                'WoW Butler $appVersionLabel · Flutter · ${Platform.operatingSystem}-${_arch()}',
                 style: WText.mono(context),
               ),
             ],

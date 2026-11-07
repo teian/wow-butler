@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../core/app_version.dart';
+
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode, this.uri});
 
@@ -20,7 +22,8 @@ class ApiException implements Exception {
 class ApiClient {
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
-  static const userAgent = 'wow-butler/1.1 (+https://github.com)';
+  static const userAgent =
+      'wow-butler/${appVersion ?? 'dev'} (+https://github.com)';
   static const _timeout = Duration(seconds: 30);
 
   final http.Client _client;
