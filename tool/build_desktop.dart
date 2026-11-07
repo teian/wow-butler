@@ -291,8 +291,9 @@ Future<List<String>> _linuxPackages(
         target.path,
       ], shell: false);
       for (final file in target.listSync().whereType<File>()) {
+        // Copy, not rename: the temp dir may be on another file system.
         outputs.add(
-          file.renameSync(p.join(destination, p.basename(file.path))).path,
+          file.copySync(p.join(destination, p.basename(file.path))).path,
         );
       }
     }
@@ -415,7 +416,11 @@ Future<int> _run(
       mode: ProcessStartMode.inheritStdio,
     );
   } on ProcessException catch (e) {
-    _fail('Could not start $command: ${e.message}');
+    _fail(
+      'Could not start $command: ${e.message}\n'
+      'Install it (see README, Desktop-Builds; nfpm comes with '
+      '`mise install`) or pass --archive-only.',
+    );
   }
   final code = await process.exitCode;
   if (check && code != 0) {
