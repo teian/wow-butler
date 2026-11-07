@@ -47,7 +47,7 @@ class SettingsPage extends StatelessWidget {
               const _SystemCard(),
               const SizedBox(height: 20),
               Text(
-                'WoW Butler 1.0.0 · Flutter · ${Platform.operatingSystem}-${_arch()}',
+                'WoW Butler 1.1.0 · Flutter · ${Platform.operatingSystem}-${_arch()}',
                 style: WText.mono(context),
               ),
             ],
