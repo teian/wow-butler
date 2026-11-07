@@ -80,6 +80,7 @@ void main() {
   Future<InstalledAddon> sync({
     required bool github,
     bool cfAllowed = false,
+    String githubAsset = 'QuestieDB-1.0.11-Forever.zip',
     List<InstalledAddon> stored = const [],
   }) async {
     final api = ApiClient(
@@ -108,7 +109,7 @@ void main() {
                 'prerelease': false,
                 'assets': [
                   {
-                    'name': 'QuestieDB-1.0.11-Forever.zip',
+                    'name': githubAsset,
                     'content_type': 'application/zip',
                     'browser_download_url': 'https://example.invalid/f.zip',
                   },
@@ -156,6 +157,20 @@ void main() {
     // and it has to come from the website.
     expect(addon.installedReleaseId, isNull);
     expect(addon.updateNeedsWebsite, isTrue);
+  });
+
+  test('ignores a GitHub repository without a build for this game', () async {
+    final addon = await sync(
+      github: true,
+      githubAsset: 'QuestieDB-1.0.11-Cata.zip',
+    );
+    expect(addon.source, AddonSourceId.curseforge);
+    expect(addon.downloadsAllowed, isFalse);
+  });
+
+  test('a TOC for another game version gives no installed version', () async {
+    final addon = await sync(github: false);
+    expect(addon.installedVersion, isNull);
   });
 
   test('uses CurseForge when it allows downloads', () async {

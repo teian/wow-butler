@@ -144,7 +144,9 @@ class GitHubSource extends AddonSource {
       final repo = _knownRepos[folder.name.toLowerCase()];
       if (toc == null || repo == null) continue;
       final addon = await getById(repo, flavor);
-      if (addon == null) continue;
+      // Without a release for this game version the repository cannot
+      // update the addon; leave the folder to other sources.
+      if (addon == null || addon.releases.isEmpty) continue;
       matches.add(
         AddonMatch(
           addon: addon,

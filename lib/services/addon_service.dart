@@ -167,6 +167,11 @@ class AddonService {
       channel = installed.channel;
     }
     final remote = match.addon;
+    // A TOC built for another game version does not tell the installed
+    // version of this client's build; only a matched release does.
+    final tocVersion = (toc?.builtForOtherFlavor(inst.flavor) ?? false)
+        ? null
+        : toc?.version;
     return InstalledAddon(
       id: previous?.id ?? newId(),
       name: remote.name,
@@ -177,7 +182,7 @@ class AddonService {
       summary: remote.summary ?? toc?.notes,
       thumbnailUrl: remote.thumbnailUrl,
       websiteUrl: remote.websiteUrl,
-      installedVersion: toc?.version ?? installed?.version,
+      installedVersion: tocVersion ?? installed?.version,
       installedReleaseId: installed?.id,
       downloadsAllowed: remote.downloadsAllowed,
       installedAt: previous?.installedAt,
