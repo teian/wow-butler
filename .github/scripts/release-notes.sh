@@ -14,6 +14,7 @@ notes=${4:-}
 
 base="https://github.com/$repo/releases/download/$tag"
 
+# Percent-encodes a file name for use in a download URL.
 urlencode() { jq -rn --arg s "$1" '$s | @uri'; }
 
 # Display order of the platforms; each entry is "label|install hint", where
@@ -31,6 +32,7 @@ categories=(
   'Other|'
 )
 
+# Prints the index into `categories` for a file name.
 category_of() {
   case "$1" in
     *.rpm) echo 0 ;;

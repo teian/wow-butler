@@ -124,16 +124,18 @@ jobs:
           .github/scripts/release-notes.sh "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" \
             dist "$RUNNER_TEMP/generated.md" > "$RUNNER_TEMP/notes.md"
 
+      # The assets are attached before the description that links them is
+      # published, so the links never point at missing files.
       - name: Create release and attach assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes="$RUNNER_TEMP/notes.md"
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* \
+              --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$notes"
           else
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
               --title "$GITHUB_REF_NAME" --notes-file "$notes"
           fi
-          gh release upload "$GITHUB_REF_NAME" dist/* \
-            --repo "$GITHUB_REPOSITORY" --clobber
