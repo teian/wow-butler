@@ -104,18 +104,36 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Download all build artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
 
+      # The description links every artifact, followed by GitHub's generated
+      # notes. It is rebuilt on every run, so re-running a release keeps the
+      # table in sync with the attached files.
+      - name: Write release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" --jq .body > "$RUNNER_TEMP/generated.md"
+          .github/scripts/release-notes.sh "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" \
+            dist "$RUNNER_TEMP/generated.md" > "$RUNNER_TEMP/notes.md"
+
       - name: Create release and attach assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+          notes="$RUNNER_TEMP/notes.md"
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$notes"
+          else
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-              --title "$GITHUB_REF_NAME" --generate-notes
+              --title "$GITHUB_REF_NAME" --notes-file "$notes"
+          fi
           gh release upload "$GITHUB_REF_NAME" dist/* \
             --repo "$GITHUB_REPOSITORY" --clobber
