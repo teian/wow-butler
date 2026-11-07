@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/addon.dart';
 import '../../core/models/game_flavor.dart';
 import '../../core/models/wow_installation.dart';
+import '../../services/addon_service.dart' show websiteOnlyMessage;
 import '../../state/addons_controller.dart';
 import '../../state/detail_providers.dart';
 import '../../state/discover_controller.dart';
@@ -63,6 +64,16 @@ class _RemoteDetailPageState extends ConsumerState<RemoteDetailPage> {
           ),
           const SizedBox(height: 20),
           _Header(addon: addon, inst: inst, category: details.value?.category),
+          if (!addon.downloadsAllowed) ...[
+            const SizedBox(height: 16),
+            WNotice(
+              'Der Autor von ${addon.name} hat Downloads über '
+              'Drittanbieter-Programme wie WoW Butler abgeschaltet. Lade das '
+              'Addon über „Auf ${addon.source.label} öffnen“ herunter; nach '
+              'der Installation erkennt WoW Butler es und zeigt Updates an.',
+              title: 'Installation nur über die Website.',
+            ),
+          ],
           const SizedBox(height: 20),
           details.when(
             loading: () => const ScreenshotPlaceholder(loading: true),
@@ -162,6 +173,13 @@ class _Header extends ConsumerWidget {
             ),
           ],
         ),
+      );
+    } else if (!addon.downloadsAllowed) {
+      action = const WButton(
+        kind: WButtonKind.primary,
+        icon: Icons.block_rounded,
+        label: 'Installieren',
+        tooltip: websiteOnlyMessage,
       );
     } else if (release == null) {
       action = Text(

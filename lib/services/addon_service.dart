@@ -5,6 +5,7 @@ import 'package:archive/archive_io.dart';
 import 'package:collection/collection.dart';
 import 'package:path/path.dart' as p;
 
+import '../core/external_addons.dart';
 import '../core/models/addon.dart';
 import '../core/models/addon_folder.dart';
 import '../core/models/wow_installation.dart';
@@ -71,9 +72,10 @@ class AddonService {
     if (!rematch) {
       for (final addon in stored) {
         // Entries without a source are re-identified on every sync: a new
-        // key or source may be able to match them now. Their preferences
-        // survive through [previousByFolder].
-        if (!addon.isManaged) continue;
+        // key or source may be able to match them now. So are entries whose
+        // source only allows website downloads, in case another source has
+        // them. Preferences survive through [previousByFolder].
+        if (!addon.isManaged || !addon.downloadsAllowed) continue;
         final existing = addon.folders
             .map((f) => byName[f.toLowerCase()]?.name)
             .nonNulls
@@ -91,6 +93,31 @@ class AddonService {
         .where((f) => f.hasAnyToc && !owned.contains(f.name.toLowerCase()))
         .toList();
 
+    /// Claims the still free folders of [folderNames]; returns the claimed
+    /// names in their original spelling.
+    List<String> claim(Iterable<String> folderNames) {
+      final free = {for (final f in remaining) f.name.toLowerCase(): f.name};
+      final taken = folderNames
+          .map((f) => free[f.toLowerCase()])
+          .nonNulls
+          .toList();
+      final takenLower = taken.map((t) => t.toLowerCase()).toSet();
+      remaining = remaining
+          .where((f) => !takenLower.contains(f.name.toLowerCase()))
+          .toList();
+      return taken;
+    }
+
+    void take(AddonMatch match) {
+      final taken = claim(match.folders);
+      if (taken.isEmpty) return;
+      final previous = previousByFolder[taken.first.toLowerCase()];
+      result.add(_fromMatch(inst, match, taken, byName, previous));
+    }
+
+    // Matches the app cannot download from are only used when no other
+    // source knows the addon.
+    final websiteOnly = <AddonMatch>[];
     for (final source in sources().active.where((s) => s.supportsMatching)) {
       if (remaining.where((f) => f.hasToc).isEmpty) break;
       final List<AddonMatch> matches;
@@ -101,18 +128,22 @@ class AddonService {
         continue;
       }
       for (final match in matches) {
-        final free = {for (final f in remaining) f.name.toLowerCase(): f.name};
-        final taken = match.folders
-            .map((f) => free[f.toLowerCase()])
-            .nonNulls
-            .toList();
-        if (taken.isEmpty) continue;
-        final previous = previousByFolder[taken.first.toLowerCase()];
-        result.add(_fromMatch(inst, match, taken, byName, previous));
-        final takenLower = taken.map((t) => t.toLowerCase()).toSet();
-        remaining = remaining
-            .where((f) => !takenLower.contains(f.name.toLowerCase()))
-            .toList();
+        if (match.addon.downloadsAllowed) {
+          take(match);
+        } else {
+          websiteOnly.add(match);
+        }
+      }
+    }
+    websiteOnly.forEach(take);
+
+    // A website-only assignment (e.g. made by hand) that no source confirmed
+    // again stays as it was instead of falling back to a local addon.
+    if (!rematch) {
+      for (final addon in stored) {
+        if (!addon.isManaged || addon.downloadsAllowed) continue;
+        final taken = claim(addon.folders);
+        if (taken.isNotEmpty) result.add(addon.copyWith(folders: taken));
       }
     }
 
@@ -148,6 +179,7 @@ class AddonService {
       websiteUrl: remote.websiteUrl,
       installedVersion: toc?.version ?? installed?.version,
       installedReleaseId: installed?.id,
+      downloadsAllowed: remote.downloadsAllowed,
       installedAt: previous?.installedAt,
       channel: channel,
       autoUpdate: previous?.autoUpdate ?? true,
@@ -198,6 +230,9 @@ class AddonService {
           folders: [folder.name],
           ignored: previous?.ignored ?? false,
           pinned: previous?.pinned ?? false,
+          external:
+              (previous?.external ?? false) ||
+              isKnownExternalAddon(folder.name),
         ),
       );
     }
@@ -265,6 +300,7 @@ class AddonService {
             summary: remote.summary,
             thumbnailUrl: remote.thumbnailUrl,
             websiteUrl: remote.websiteUrl,
+            downloadsAllowed: remote.downloadsAllowed,
             latestRelease: remote.latestFor(a.channel),
             clearLatestRelease: remote.latestFor(a.channel) == null,
           )
@@ -277,6 +313,9 @@ class AddonService {
   /// Installs [release] of [remote], replacing any previous install and
   /// taking over folders that other entries claimed. Required dependencies
   /// that are missing get installed as well.
+  ///
+  /// Equivalent to [prepare] followed by [apply]; callers that run several
+  /// installs at once use the two steps to download in parallel.
   Future<List<InstalledAddon>> install(
     WowInstallation inst,
     List<InstalledAddon> addons, {
@@ -286,24 +325,43 @@ class AddonService {
     ProgressCallback? onProgress,
     Set<String>? visited,
   }) async {
-    visited ??= {};
-    visited.add(remote.key);
+    final prepared = await prepare(
+      inst,
+      remote: remote,
+      release: release,
+      onProgress: onProgress,
+    );
+    return apply(
+      inst,
+      addons,
+      prepared,
+      channel: channel,
+      onProgress: onProgress,
+      visited: visited,
+    );
+  }
+
+  /// Downloads and extracts [release] into a staging folder without touching
+  /// the AddOns folder, so several downloads can run at the same time.
+  /// Pass the result to [apply], or [PreparedInstall.discard] it.
+  Future<PreparedInstall> prepare(
+    WowInstallation inst, {
+    required RemoteAddon remote,
+    required AddonRelease release,
+    ProgressCallback? onProgress,
+  }) async {
     if (release.downloadUrl.isEmpty) {
-      throw AddonException(
-        '${remote.name}: Der Autor erlaubt keine Downloads über '
-        'Drittanbieter-Programme. Bitte über die Website installieren.',
-      );
+      throw AddonException('${remote.name}: $websiteOnlyMessage');
     }
 
     final source = sources()[remote.source];
-    final addonsDir = Directory(inst.addonsPath);
-    await addonsDir.create(recursive: true);
     // Staging lives next to AddOns so the final move is a cheap rename on
     // the same filesystem.
     final staging = Directory(
       p.join(inst.interfacePath, '.wow-butler-staging', newId()),
     );
     await staging.create(recursive: true);
+    final prepared = PreparedInstall._(remote, release, staging);
 
     try {
       final zip = File(p.join(staging.path, 'download.zip'));
@@ -316,13 +374,40 @@ class AddonService {
       );
 
       final extractDir = p.join(staging.path, 'extract');
-      final newFolders = await _extractInIsolate(zip.path, extractDir);
-      if (newFolders.isEmpty) {
+      final folders = await _extractInIsolate(zip.path, extractDir);
+      if (folders.isEmpty) {
         throw AddonException(
           '${remote.name}: Archiv enthält keine Addon-Ordner.',
         );
       }
+      prepared._folders = folders;
       onProgress?.call(0.85);
+      return prepared;
+    } catch (_) {
+      await prepared.discard();
+      rethrow;
+    }
+  }
+
+  /// Moves a [prepared] release into the AddOns folder and returns the new
+  /// addon list based on [addons]. Callers must not run two [apply] calls
+  /// for the same installation at once.
+  Future<List<InstalledAddon>> apply(
+    WowInstallation inst,
+    List<InstalledAddon> addons,
+    PreparedInstall prepared, {
+    ReleaseChannel? channel,
+    ProgressCallback? onProgress,
+    Set<String>? visited,
+  }) async {
+    final remote = prepared.remote;
+    final release = prepared.release;
+    visited ??= {};
+    visited.add(remote.key);
+    try {
+      final addonsDir = Directory(inst.addonsPath);
+      await addonsDir.create(recursive: true);
+      final newFolders = prepared._folders;
 
       final existing = addons.firstWhereOrNull(
         (a) => a.remoteKey == remote.key,
@@ -354,6 +439,7 @@ class AddonService {
         installedVersion: release.version,
         installedReleaseId: release.id,
         installedAt: DateTime.now(),
+        downloadsAllowed: remote.downloadsAllowed,
         channel: effectiveChannel,
         autoUpdate: existing?.autoUpdate ?? true,
         pinned: false,
@@ -377,6 +463,7 @@ class AddonService {
               (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
             );
 
+      final source = sources()[remote.source];
       for (final depId in release.dependencies) {
         final key = '${remote.source.name}:$depId';
         if (visited.contains(key) || result.any((a) => a.remoteKey == key)) {
@@ -403,11 +490,7 @@ class AddonService {
       onProgress?.call(1);
       return result;
     } finally {
-      await staging.delete(recursive: true).catchError((_) => staging);
-      final root = staging.parent;
-      if (await root.exists() && await root.list().isEmpty) {
-        await root.delete().catchError((_) => root);
-      }
+      await prepared.discard();
     }
   }
 
@@ -419,6 +502,25 @@ class AddonService {
     List<InstalledAddon> addons,
     InstalledAddon addon, {
     ProgressCallback? onProgress,
+    bool force = false,
+  }) async {
+    final plan = await planUpdate(inst, addon, force: force);
+    if (plan.upToDate) return markUpToDate(addons, addon, plan.release);
+    return install(
+      inst,
+      addons,
+      remote: plan.remote,
+      release: plan.release,
+      channel: addon.channel,
+      onProgress: onProgress,
+    );
+  }
+
+  /// Resolves the release an update of [addon] installs. Without [force]
+  /// the plan reports when that release is already installed.
+  Future<UpdatePlan> planUpdate(
+    WowInstallation inst,
+    InstalledAddon addon, {
     bool force = false,
   }) async {
     if (!addon.isManaged) {
@@ -433,21 +535,22 @@ class AddonService {
         '${addon.name}: Keine passende Version für ${inst.flavor.label}.',
       );
     }
-    if (!force && release.id == addon.installedReleaseId) {
-      return [
-        for (final a in addons)
-          a.id == addon.id ? a.copyWith(latestRelease: release) : a,
-      ];
-    }
-    return install(
-      inst,
-      addons,
-      remote: remote,
-      release: release,
-      channel: addon.channel,
-      onProgress: onProgress,
+    return UpdatePlan(
+      remote,
+      release,
+      upToDate: !force && release.id == addon.installedReleaseId,
     );
   }
+
+  /// [addons] with [release] recorded as the latest one of [addon].
+  List<InstalledAddon> markUpToDate(
+    List<InstalledAddon> addons,
+    InstalledAddon addon,
+    AddonRelease release,
+  ) => [
+    for (final a in addons)
+      a.id == addon.id ? a.copyWith(latestRelease: release) : a,
+  ];
 
   Future<List<InstalledAddon>> uninstall(
     WowInstallation inst,
@@ -467,6 +570,45 @@ class AddonService {
     } on FileSystemException {
       // Different filesystem (e.g. symlinked AddOns): copy instead.
       await _copyInIsolate(from, to);
+    }
+  }
+}
+
+/// Shown when an author disallows downloads through third-party tools.
+const websiteOnlyMessage =
+    'Der Autor erlaubt keine Downloads über Drittanbieter-Programme. '
+    'Bitte über die Website installieren.';
+
+/// What an update of an addon would install.
+class UpdatePlan {
+  const UpdatePlan(this.remote, this.release, {required this.upToDate});
+
+  final RemoteAddon remote;
+  final AddonRelease release;
+
+  /// [release] is already installed; nothing to download.
+  final bool upToDate;
+}
+
+/// A release downloaded and extracted by [AddonService.prepare], waiting in
+/// a staging folder to be moved into AddOns by [AddonService.apply].
+class PreparedInstall {
+  PreparedInstall._(this.remote, this.release, this._staging);
+
+  final RemoteAddon remote;
+  final AddonRelease release;
+  final Directory _staging;
+  List<String> _folders = const [];
+
+  /// Deletes the staging folder; safe to call more than once.
+  Future<void> discard() async {
+    if (await _staging.exists()) {
+      await _staging.delete(recursive: true).catchError((_) => _staging);
+    }
+    final root = _staging.parent;
+    // Another download may be staging in parallel; only an empty root goes.
+    if (await root.exists() && await root.list().isEmpty) {
+      await root.delete().catchError((_) => root);
     }
   }
 }

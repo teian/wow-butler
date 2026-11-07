@@ -72,6 +72,14 @@ class TocFile {
   String? get tukuiProjectId => _id('X-Tukui-ProjectID');
   String? get website => _id('X-Website');
 
+  /// Whether a packager marked this as a build for another game version
+  /// (`## X-Flavor: Cata` installed on Forever). Such an install should be
+  /// replaced by the right build, so its version counts as unknown.
+  bool builtForOtherFlavor(GameFlavor flavor) {
+    final builtFor = this['X-Flavor']?.trim().toLowerCase();
+    return builtFor != null && builtFor.isNotEmpty && builtFor != flavor.name;
+  }
+
   /// A folder shipping `LoadOnDemand` with a parent dependency is a module of
   /// another addon rather than an addon of its own.
   bool get isLoadOnDemand => this['LoadOnDemand']?.trim() == '1';

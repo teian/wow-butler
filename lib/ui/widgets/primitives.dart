@@ -45,6 +45,57 @@ class _HoverState extends State<Hover> {
 
 enum WButtonKind { primary, blue, outline, outlineBlue, danger, ghost }
 
+/// Amber information box, optionally with an action button.
+class WNotice extends StatelessWidget {
+  const WNotice(this.message, {super.key, this.title, this.action});
+
+  final String message;
+  final String? title;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = context.w;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: WColors.amber.withValues(alpha: 0.08),
+        border: Border.all(color: WColors.amber.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: WColors.amber,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  if (title != null)
+                    TextSpan(
+                      text: '$title  ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: w.fg,
+                      ),
+                    ),
+                  TextSpan(text: message),
+                ],
+              ),
+              style: TextStyle(fontSize: 12.5, color: w.fg2, height: 1.4),
+            ),
+          ),
+          if (action != null) ...[const SizedBox(width: 12), action!],
+        ],
+      ),
+    );
+  }
+}
+
 class WButton extends StatelessWidget {
   const WButton({
     super.key,
@@ -55,6 +106,7 @@ class WButton extends StatelessWidget {
     this.trailingIcon,
     this.small = false,
     this.expand = false,
+    this.tooltip,
   });
 
   final String label;
@@ -65,8 +117,16 @@ class WButton extends StatelessWidget {
   final bool small;
   final bool expand;
 
+  /// Shown on hover; explains a disabled button, for example.
+  final String? tooltip;
+
   @override
   Widget build(BuildContext context) {
+    final button = _build(context);
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
+  }
+
+  Widget _build(BuildContext context) {
     final w = context.w;
     final enabled = onPressed != null;
     return Hover(
@@ -346,13 +406,29 @@ class WBadge extends StatelessWidget {
 }
 
 class SourceBadge extends StatelessWidget {
-  const SourceBadge(this.source, {super.key, this.width});
+  const SourceBadge(
+    this.source, {
+    super.key,
+    this.width,
+    this.external = false,
+  });
 
   final AddonSourceId? source;
   final double? width;
 
+  /// Labels a local addon as distributed by subscription or external software.
+  final bool external;
+
   @override
   Widget build(BuildContext context) {
+    if (source == null && external) {
+      return WBadge(
+        'Extern',
+        fg: WColors.amber,
+        bg: WColors.amber.withValues(alpha: 0.14),
+        width: width,
+      );
+    }
     final c = sourceColors(context, source);
     return WBadge(source?.label ?? 'Lokal', fg: c.fg, bg: c.bg, width: width);
   }
@@ -368,6 +444,13 @@ class StatusPill extends StatelessWidget {
 
   static StatusPill of(BuildContext context, InstalledAddon a) {
     final w = context.w;
+    if (!a.isManaged && a.external) {
+      return StatusPill(
+        'EXTERN',
+        fg: WColors.amber,
+        bg: WColors.amber.withValues(alpha: 0.14),
+      );
+    }
     if (!a.isManaged) return StatusPill('LOKAL', fg: w.muted, bg: w.chip);
     if (a.ignored) return StatusPill('IGNORIERT', fg: w.muted, bg: w.chip);
     if (a.pinned) {
@@ -376,6 +459,16 @@ class StatusPill extends StatelessWidget {
         fg: WColors.blueLight,
         bg: WColors.blueLight.withValues(alpha: 0.14),
       );
+    }
+    if (a.updateNeedsWebsite) {
+      return StatusPill(
+        'UPDATE · WEBSITE',
+        fg: WColors.amber,
+        bg: WColors.amber.withValues(alpha: 0.14),
+      );
+    }
+    if (!a.downloadsAllowed) {
+      return StatusPill('NUR WEBSITE', fg: w.muted, bg: w.chip);
     }
     if (a.hasUpdate) {
       return StatusPill(

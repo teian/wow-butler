@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/addon.dart';
 import '../../core/models/addon_category.dart';
 import '../../core/models/wow_installation.dart';
+import '../../services/addon_service.dart' show websiteOnlyMessage;
 import '../../state/addons_controller.dart';
 import '../../state/discover_controller.dart';
 import '../../state/nav_controller.dart';
@@ -315,6 +316,14 @@ class _ResultCard extends ConsumerWidget {
             ),
           ],
         ),
+      );
+    } else if (!addon.downloadsAllowed) {
+      action = const WButton(
+        kind: WButtonKind.blue,
+        small: true,
+        icon: Icons.block_rounded,
+        label: 'Nur über Website',
+        tooltip: websiteOnlyMessage,
       );
     } else if (release == null) {
       action = Tooltip(

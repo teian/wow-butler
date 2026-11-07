@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models/addon.dart';
 import '../core/models/wow_installation.dart';
+import '../core/util/limiter.dart';
 import '../services/backup/zip_backup_service.dart';
 import 'activity_log.dart';
 import 'backup_controller.dart';
@@ -68,8 +69,10 @@ class AddonsState {
   final String? backupMessage;
   final DateTime? lastChecked;
 
+  /// Addons the app can update itself; updates that are only available on
+  /// the website are left out, so (automatic) batch updates skip them.
   List<InstalledAddon> get updatable =>
-      addons.where((a) => a.hasUpdate).toList();
+      addons.where((a) => a.hasUpdate && !a.updateNeedsWebsite).toList();
 
   QueueItem? queued(String addonId) =>
       queue.where((q) => q.addonId == addonId && !q.finished).firstOrNull;
@@ -112,6 +115,11 @@ class AddonsController extends Notifier<AddonsState> {
 
   final String installationId;
   Future<void> _serialQueue = Future.value();
+
+  /// Bounds parallel downloads (installs and updates) to the setting.
+  late final _downloads = Limiter(
+    () => ref.read(settingsProvider).parallelDownloads,
+  );
   bool _started = false;
 
   @override
@@ -234,9 +242,11 @@ class AddonsController extends Notifier<AddonsState> {
     );
 
     await _backupWtfBeforeUpdate(inst);
-    for (final addon in targets) {
-      await _runQueued(inst, addon, force: false);
-    }
+    // Downloads run in parallel up to the configured limit; moving the files
+    // into AddOns happens one addon at a time.
+    await Future.wait([
+      for (final addon in targets) _runQueued(inst, addon, force: false),
+    ]);
   }
 
   /// Installs the current release again, e.g. to repair modified files.
@@ -273,25 +283,46 @@ class AddonsController extends Notifier<AddonsState> {
       );
     }
 
-    stage(QueueStage.downloading, progress: 0.02);
+    void progress(double v) => stage(
+      v < 0.8 ? QueueStage.downloading : QueueStage.extracting,
+      progress: v,
+    );
+
+    InstalledAddon current() =>
+        state.addons.where((a) => a.id == addon.id).firstOrNull ?? addon;
+
+    final service = ref.read(addonServiceProvider);
     try {
-      await _serial(() async {
-        final current =
-            state.addons.where((a) => a.id == addon.id).firstOrNull ?? addon;
-        final updated = await ref
-            .read(addonServiceProvider)
-            .update(
-              inst,
-              state.addons,
-              current,
-              force: force,
-              onProgress: (v) => stage(
-                v < 0.8 ? QueueStage.downloading : QueueStage.extracting,
-                progress: v,
-              ),
-            );
-        await _commit(updated);
+      final prepared = await _downloads.run(() async {
+        stage(QueueStage.downloading, progress: 0.02);
+        final plan = await service.planUpdate(inst, current(), force: force);
+        if (plan.upToDate) {
+          await _serial(
+            () => _commit(
+              service.markUpToDate(state.addons, current(), plan.release),
+            ),
+          );
+          return null;
+        }
+        return service.prepare(
+          inst,
+          remote: plan.remote,
+          release: plan.release,
+          onProgress: progress,
+        );
       });
+      if (prepared != null) {
+        await _serial(() async {
+          final updated = await service.apply(
+            inst,
+            state.addons,
+            prepared,
+            channel: current().channel,
+            onProgress: progress,
+          );
+          await _commit(updated);
+        });
+      }
       stage(QueueStage.done, progress: 1);
     } catch (e) {
       stage(QueueStage.failed, progress: 1, error: '$e');
@@ -328,13 +359,14 @@ class AddonsController extends Notifier<AddonsState> {
     state = state.copyWith(queue: const [], clearBackupMessage: true);
   }
 
-  Future<void> install(
+  /// Installs [release]; returns whether it succeeded (failures are logged).
+  Future<bool> install(
     RemoteAddon remote,
     AddonRelease release, {
     ReleaseChannel? channel,
   }) async {
     final inst = _inst;
-    if (inst == null) return;
+    if (inst == null) return false;
     void progress(double? v) {
       final next = {...state.installing};
       v == null ? next.remove(remote.key) : next[remote.key] = v;
@@ -342,23 +374,31 @@ class AddonsController extends Notifier<AddonsState> {
     }
 
     progress(0);
+    final service = ref.read(addonServiceProvider);
     try {
+      final prepared = await _downloads.run(
+        () => service.prepare(
+          inst,
+          remote: remote,
+          release: release,
+          onProgress: progress,
+        ),
+      );
       await _serial(() async {
-        final updated = await ref
-            .read(addonServiceProvider)
-            .install(
-              inst,
-              state.addons,
-              remote: remote,
-              release: release,
-              channel: channel,
-              onProgress: progress,
-            );
+        final updated = await service.apply(
+          inst,
+          state.addons,
+          prepared,
+          channel: channel,
+          onProgress: progress,
+        );
         await _commit(updated);
       });
       _log.success('${remote.name} ${release.version} installiert');
+      return true;
     } catch (e) {
       _log.error('${remote.name}: $e');
+      return false;
     } finally {
       progress(null);
     }
@@ -403,6 +443,11 @@ class AddonsController extends Notifier<AddonsState> {
   Future<void> setPinned(Iterable<String> ids, bool value) =>
       _modify(ids, (a) => a.copyWith(pinned: value));
 
+  /// Marks local addons as distributed only by subscription or external
+  /// software; managed addons are left alone.
+  Future<void> setExternal(Iterable<String> ids, bool value) =>
+      _modify(ids, (a) => a.isManaged ? a : a.copyWith(external: value));
+
   /// Links an installed addon to [remote] without reinstalling it. The
   /// installed release is recognized by version when possible; otherwise
   /// the next update simply installs the source's current release.
@@ -419,6 +464,7 @@ class AddonsController extends Notifier<AddonsState> {
         name: remote.name,
         source: remote.source,
         externalId: remote.externalId,
+        downloadsAllowed: remote.downloadsAllowed,
         author: remote.author,
         summary: remote.summary,
         thumbnailUrl: remote.thumbnailUrl,
@@ -448,21 +494,27 @@ class AddonsController extends Notifier<AddonsState> {
     final inst = _inst;
     if (inst == null) return 0;
     final registry = ref.read(sourcesProvider);
-    var installed = 0;
-    for (final entry in manifest.where((a) => a.isManaged)) {
-      if (state.addons.any((a) => a.remoteKey == entry.remoteKey)) continue;
+
+    Future<bool> restore(InstalledAddon entry) async {
       final source = registry[entry.source!];
-      if (!source.isAvailable) continue;
+      if (!source.isAvailable) return false;
       try {
         final remote = await source.getById(entry.externalId!, inst.flavor);
         final release = remote?.latestFor(entry.channel);
-        if (remote == null || release == null) continue;
-        await install(remote, release, channel: entry.channel);
-        installed++;
+        if (remote == null || release == null) return false;
+        return await install(remote, release, channel: entry.channel);
       } catch (e) {
         _log.error('${entry.name}: $e');
+        return false;
       }
     }
-    return installed;
+
+    // [install] bounds the parallel downloads.
+    final results = await Future.wait([
+      for (final entry in manifest.where((a) => a.isManaged))
+        if (!state.addons.any((a) => a.remoteKey == entry.remoteKey))
+          restore(entry),
+    ]);
+    return results.where((ok) => ok).length;
   }
 }

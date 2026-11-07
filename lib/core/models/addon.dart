@@ -1,3 +1,4 @@
+import '../util/version_label.dart';
 import 'game_flavor.dart';
 import 'wow_installation.dart';
 
@@ -97,6 +98,7 @@ class RemoteAddon {
     this.downloadCount,
     this.updatedAt,
     this.releases = const [],
+    this.downloadsAllowed = true,
   });
 
   final AddonSourceId source;
@@ -111,6 +113,11 @@ class RemoteAddon {
 
   /// Latest known releases, typically one per channel.
   final List<AddonRelease> releases;
+
+  /// `false` when the author disallows downloads through third-party tools
+  /// (CurseForge's "allow mod distribution"); the addon can then only be
+  /// installed from its website.
+  final bool downloadsAllowed;
 
   String get key => '${source.name}:$externalId';
 
@@ -151,6 +158,8 @@ class InstalledAddon {
     this.autoUpdate = true,
     this.ignored = false,
     this.pinned = false,
+    this.external = false,
+    this.downloadsAllowed = true,
     this.latestRelease,
     this.interfaces = const [],
   });
@@ -184,6 +193,13 @@ class InstalledAddon {
   /// Stays on the installed version; newer versions are still shown.
   final bool pinned;
 
+  /// A local addon that is only available through a subscription or its own
+  /// client (Zygor, RestedXP, …), so no source can ever manage it.
+  final bool external;
+
+  /// Mirrors [RemoteAddon.downloadsAllowed] of the assigned source.
+  final bool downloadsAllowed;
+
   /// Most recent release for [channel], refreshed by update checks.
   final AddonRelease? latestRelease;
   final List<int> interfaces;
@@ -203,6 +219,12 @@ class InstalledAddon {
   /// Whether the addon takes part in updates.
   bool get hasUpdate => newerAvailable && !ignored && !pinned;
 
+  /// The author disallows downloads through third-party tools (CurseForge
+  /// returns no download URL), so the update has to come from the website.
+  bool get updateNeedsWebsite =>
+      hasUpdate &&
+      (!downloadsAllowed || (latestRelease?.downloadUrl.isEmpty ?? false));
+
   InstalledAddon copyWith({
     String? name,
     List<String>? folders,
@@ -219,6 +241,8 @@ class InstalledAddon {
     bool? autoUpdate,
     bool? ignored,
     bool? pinned,
+    bool? external,
+    bool? downloadsAllowed,
     AddonRelease? latestRelease,
     bool clearLatestRelease = false,
     List<int>? interfaces,
@@ -239,6 +263,8 @@ class InstalledAddon {
     autoUpdate: autoUpdate ?? this.autoUpdate,
     ignored: ignored ?? this.ignored,
     pinned: pinned ?? this.pinned,
+    external: external ?? this.external,
+    downloadsAllowed: downloadsAllowed ?? this.downloadsAllowed,
     latestRelease: clearLatestRelease
         ? null
         : latestRelease ?? this.latestRelease,
@@ -262,6 +288,8 @@ class InstalledAddon {
     'autoUpdate': autoUpdate,
     'ignored': ignored,
     'pinned': pinned,
+    'external': external,
+    'downloadsAllowed': downloadsAllowed,
     'latestRelease': latestRelease?.toJson(),
     'interfaces': interfaces,
   };
@@ -276,7 +304,11 @@ class InstalledAddon {
     summary: json['summary'] as String?,
     thumbnailUrl: json['thumbnailUrl'] as String?,
     websiteUrl: json['websiteUrl'] as String?,
-    installedVersion: json['installedVersion'] as String?,
+    // Older releases stored archive names such as `Foo1.2.zip` as version.
+    installedVersion: switch (json['installedVersion']) {
+      final String v => versionLabel(v),
+      _ => null,
+    },
     installedReleaseId: json['installedReleaseId'] as String?,
     installedAt: DateTime.tryParse(json['installedAt'] as String? ?? ''),
     channel:
@@ -285,6 +317,8 @@ class InstalledAddon {
     autoUpdate: json['autoUpdate'] as bool? ?? true,
     ignored: json['ignored'] as bool? ?? false,
     pinned: json['pinned'] as bool? ?? false,
+    external: json['external'] as bool? ?? false,
+    downloadsAllowed: json['downloadsAllowed'] as bool? ?? true,
     latestRelease: json['latestRelease'] == null
         ? null
         : AddonRelease.fromJson(json['latestRelease'] as Map<String, dynamic>),
