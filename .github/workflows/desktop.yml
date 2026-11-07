@@ -49,7 +49,6 @@ jobs:
           tar -xzf "$archive" -C "$RUNNER_TEMP/nfpm" nfpm
           echo "NFPM=$RUNNER_TEMP/nfpm/nfpm" >> "$GITHUB_ENV"
 
-      # Inno Setup 6 is preinstalled on the Windows runner image.
       - name: Install WiX Toolset
         if: matrix.target == 'windows'
         run: |

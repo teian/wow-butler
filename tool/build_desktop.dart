@@ -5,14 +5,14 @@
 //
 // Produces a portable archive plus native installers in dist/:
 //   linux:   .tar.gz, .deb (Debian/Ubuntu), .rpm (Fedora), .pkg.tar.zst (Arch)
-//   windows: .zip, setup .exe (Inno Setup), .msi (WiX Toolset v5)
+//   windows: .zip, .msi (WiX Toolset v5)
 //   macos:   .zip, .dmg
 //
 // Archives and checksums use the project's own dependencies (archive,
 // crypto). macOS packaging shells out to the system's `ditto` and `hdiutil`.
 // The installers need, on PATH or via the named environment variable:
 //   linux:   nfpm (NFPM)
-//   windows: ISCC.exe from Inno Setup 6 (ISCC) and the `wix` dotnet tool (WIX)
+//   windows: the `wix` dotnet tool (WIX)
 // --archive-only skips the installers and their tools.
 // ignore_for_file: avoid_print
 import 'dart:convert';
@@ -147,7 +147,7 @@ Future<void> main(List<String> args) async {
   if (!archiveOnly) {
     final installers = switch (target) {
       'linux' => _linuxPackages(bundle, release, arch, destination.path),
-      'windows' => _windowsInstallers(
+      'windows' => _windowsInstaller(
         bundle,
         release,
         arch,
@@ -167,8 +167,8 @@ Future<void> main(List<String> args) async {
 }
 
 /// pubspec `1.2.3-beta+4` as the pieces installers want: `1.2.3-beta` for
-/// display and Linux packages, `1.2.3` for Windows' numeric-only version
-/// fields and `4` as the package release.
+/// display and Linux packages, `1.2.3` for the MSI's numeric-only
+/// version and `4` as the package release.
 class _Version {
   const _Version(this.display, this.numeric, this.build);
 
@@ -185,19 +185,10 @@ class _Version {
   final String build;
 }
 
-/// The tool from [envVar] if set, else the first existing [candidates]
-/// path, else [fallback] for a PATH lookup.
-String _tool(
-  String envVar,
-  String fallback, [
-  List<String> candidates = const [],
-]) {
+/// The tool from [envVar] if set, else [fallback] for a PATH lookup.
+String _tool(String envVar, String fallback) {
   final override = Platform.environment[envVar];
-  if (override != null && override.isNotEmpty) return override;
-  return candidates.firstWhere(
-    (path) => File(path).existsSync(),
-    orElse: () => fallback,
-  );
+  return override == null || override.isEmpty ? fallback : override;
 }
 
 /// .deb, .rpm and Arch packages via nfpm. The bundle goes to
@@ -303,33 +294,14 @@ Future<List<String>> _linuxPackages(
   }
 }
 
-/// Inno Setup .exe (per-user by default, all users on request) and a
-/// per-machine WiX .msi.
-Future<List<String>> _windowsInstallers(
+/// Per-machine .msi built with the WiX Toolset.
+Future<List<String>> _windowsInstaller(
   String bundle,
   _Version version,
   String arch,
   String destination,
   String name,
 ) async {
-  final programFiles = [
-    Platform.environment['ProgramFiles(x86)'],
-    Platform.environment['ProgramFiles'],
-  ].nonNulls;
-  final iscc = _tool('ISCC', 'ISCC.exe', [
-    for (final dir in programFiles) p.join(dir, 'Inno Setup 6', 'ISCC.exe'),
-  ]);
-  final setupName = '$name-setup';
-  await _run(iscc, [
-    '/DAppVersion=${version.display}',
-    '/DFileVersion=${version.numeric}',
-    '/DArch=$arch',
-    '/DSourceDir=$bundle',
-    '/DOutputDir=$destination',
-    '/DOutputName=$setupName',
-    p.join(root, 'packaging', 'windows', 'wow-butler.iss'),
-  ], shell: false);
-
   final msi = p.join(destination, '$name.msi');
   await _run(_tool('WIX', 'wix'), [
     'build',
@@ -348,7 +320,7 @@ Future<List<String>> _windowsInstallers(
     msi,
   ], shell: false);
 
-  return [p.join(destination, '$setupName.exe'), msi];
+  return [msi];
 }
 
 /// Compressed disk image with the app and an /Applications shortcut for
