@@ -35,6 +35,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libx11-dev libxi-dev
 
+      - name: Install nfpm
+        if: matrix.target == 'linux'
+        env:
+          NFPM_VERSION: 2.48.0
+          NFPM_SHA256: 6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750
+        run: |
+          archive="$RUNNER_TEMP/nfpm.tar.gz"
+          curl -fsSL -o "$archive" \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "$NFPM_SHA256  $archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/nfpm"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/nfpm" nfpm
+          echo "NFPM=$RUNNER_TEMP/nfpm/nfpm" >> "$GITHUB_ENV"
+
+      # Inno Setup 6 is preinstalled on the Windows runner image.
+      - name: Install WiX Toolset
+        if: matrix.target == 'windows'
+        run: |
+          dotnet tool install wix --version 5.0.2 --tool-path "$RUNNER_TEMP/wix"
+          echo "WIX=$RUNNER_TEMP/wix/wix.exe" >> "$GITHUB_ENV"
+
       - name: Read Flutter version
         id: flutter-version
         run: |
@@ -66,7 +87,7 @@ jobs:
       - name: Build and package
         run: dart run tool/build_desktop.dart ${{ matrix.target }}
 
-      - name: Upload app and checksum
+      - name: Upload packages and checksums
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wow-butler-${{ matrix.target }}

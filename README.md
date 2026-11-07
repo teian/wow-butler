@@ -43,12 +43,17 @@ Git-Backups benötigen ein installiertes `git`.
 ## Desktop-Builds
 
 Release-Builds werden auf dem jeweiligen Betriebssystem erstellt. Voraussetzungen:
-Flutter aus `mise.toml` und die native Toolchain (`flutter doctor`) – weitere
-Werkzeuge sind nicht nötig, das Packaging läuft in Dart mit den Projektabhängigkeiten.
+Flutter aus `mise.toml` und die native Toolchain (`flutter doctor`). Portable Archive
+und Prüfsummen entstehen in Dart mit den Projektabhängigkeiten; für die Installer
+kommen pro Plattform Paketierungswerkzeuge hinzu.
 
-- **Linux:** Clang, CMake, Ninja, pkg-config und GTK-3-Entwicklungsbibliotheken.
-- **Windows:** Visual Studio 2022 mit „Desktop development with C++“ und Windows SDK.
+- **Linux:** Clang, CMake, Ninja, pkg-config und GTK-3-Entwicklungsbibliotheken;
+  für die Pakete [nfpm](https://nfpm.goreleaser.com), das `mise install` mitinstalliert.
+- **Windows:** Visual Studio 2022 mit „Desktop development with C++“ und Windows SDK;
+  für die Installer [Inno Setup 6](https://jrsoftware.org/isinfo.php) und das
+  [WiX Toolset v5](https://wixtoolset.org) (`dotnet tool install --global wix --version 5.0.2`).
 - **macOS:** Xcode und seine Command Line Tools; CocoaPods für Plugins, die es benötigen.
+  Das DMG erstellt das mitgelieferte `hdiutil`.
 
 Auf dem jeweiligen System im Projektordner ausführen:
 
@@ -59,21 +64,33 @@ dart run tool/build_desktop.dart macos
 ```
 
 Ohne Plattformargument wird das aktuelle Betriebssystem gewählt.
-Mit `--skip-build` wird ein vorhandener Release-Build erneut verpackt.
+Mit `--skip-build` wird ein vorhandener Release-Build erneut verpackt,
+mit `--archive-only` entstehen nur die portablen Archive ohne Installer.
+Werkzeuge, die nicht im `PATH` liegen, lassen sich über die Umgebungsvariablen
+`NFPM`, `ISCC` und `WIX` angeben.
 
-Die Archive und SHA-256-Prüfsummen liegen in `dist/`:
+Pakete, Installer und ihre SHA-256-Prüfsummen liegen in `dist/`:
 
-| Plattform | Archiv | Start nach dem Entpacken |
+| Plattform | Datei | Installation |
 | --- | --- | --- |
-| Linux | `wow-butler-<version>-linux-<arch>.tar.gz` | `wow-butler/wow_butler` |
-| Windows | `wow-butler-<version>-windows-<arch>.zip` | `wow-butler/wow_butler.exe` |
+| Debian/Ubuntu | `wow-butler_<version>-<build>_<arch>.deb` | `sudo apt install ./<datei>.deb` |
+| Fedora | `wow-butler-<version>-<build>.<arch>.rpm` | `sudo dnf install ./<datei>.rpm` |
+| Arch Linux | `wow-butler-<version>-<build>-<arch>.pkg.tar.zst` | `sudo pacman -U <datei>.pkg.tar.zst` |
+| Linux (portabel) | `wow-butler-<version>-linux-<arch>.tar.gz` | entpacken, `wow-butler/wow_butler` starten |
+| Windows | `wow-butler-<version>-windows-<arch>-setup.exe` | Setup; pro Benutzer oder für alle Benutzer |
+| Windows | `wow-butler-<version>-windows-<arch>.msi` | MSI für alle Benutzer, z. B. für Softwareverteilung |
+| Windows (portabel) | `wow-butler-<version>-windows-<arch>.zip` | entpacken, `wow-butler/wow_butler.exe` starten |
+| macOS | `wow-butler-<version>-macos-<arch>.dmg` | `wow_butler.app` auf „Programme“ ziehen |
 | macOS | `wow-butler-<version>-macos-<arch>.zip` | `wow_butler.app` in „Programme“ verschieben |
 
-Unter Windows und Linux den gesamten entpackten Ordner einschließlich Bibliotheken
-und `data/` behalten. Linux benötigt GTK 3 und die üblichen Desktop-Systembibliotheken;
-Windows benötigt die Microsoft Visual C++ Redistributable für die Zielarchitektur.
+Die Linux-Pakete installieren die App nach `/usr/lib/wow-butler` mit dem Befehl
+`wow_butler`, Startmenü-Eintrag und Icons; sie hängen von GTK 3 ab und empfehlen
+`git` (Git-Backups) sowie `xdg-desktop-portal` (Ordnerauswahl). Unter Windows und
+Linux beim portablen Archiv den gesamten entpackten Ordner einschließlich Bibliotheken
+und `data/` behalten. Windows benötigt die Microsoft Visual C++ Redistributable für
+die Zielarchitektur.
 macOS wird standardmäßig für Intel und Apple Silicon gebaut (`universal`);
-bei einer lokal konfigurierten Einzelarchitektur heißt das Archiv entsprechend
+bei einer lokal konfigurierten Einzelarchitektur heißen die Dateien entsprechend
 `arm64` oder `x64`. Die macOS-App ist für direkte
 Verteilung ohne App Sandbox konfiguriert, damit WoW-Ordner und Git erreichbar sind.
 Die Builds enthalten keine Publisher-Signatur oder Apple-Notarisierung.
@@ -81,7 +98,8 @@ Die Builds enthalten keine Publisher-Signatur oder Apple-Notarisierung.
 Der GitHub-Actions-Workflow `.github/workflows/desktop.yml` baut und prüft alle drei
 Plattformen auf nativen Runnern bei Push, Pull Request und manuellem Start. Nach
 einem erfolgreichen Lauf können die Archive unter **Actions → Desktop builds →
-Artifacts** heruntergeladen werden. Die Flutter-Version wird aus `mise.toml` gelesen.
+Artifacts** heruntergeladen werden; bei einem Tag `v*` werden sie zusätzlich an das
+GitHub-Release angehängt. Die Flutter-Version wird aus `mise.toml` gelesen.
 
 ## Lizenz
 

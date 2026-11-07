@@ -1,0 +1,52 @@
+<!--
+  WiX Toolset v5 source for the WoW Butler .msi (per-machine install).
+
+  Built by tool/build_desktop.dart:
+    wix build packaging/windows/wow-butler.wxs -arch x64|arm64
+      -d Version=1.2.3 -d IconFile=<app_icon.ico> -bindpath bundle=<Release folder> -o <file>.msi
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!-- Stable identity: keep this UpgradeCode so upgrades replace the install. -->
+  <Package
+    Name="WoW Butler"
+    Manufacturer="Frank Gehann"
+    Version="$(var.Version)"
+    UpgradeCode="19C7E1D8-478D-48A7-807F-EE8673CF7A25"
+    Scope="perMachine"
+    Language="1033">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of WoW Butler is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon.ico" SourceFile="$(var.IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/teian/wow-butler" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="WoW Butler" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut
+          Id="StartMenuShortcut"
+          Name="WoW Butler"
+          Target="[INSTALLFOLDER]wow_butler.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AppIcon.ico" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\WoW Butler"
+          Name="StartMenuShortcut"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Main">
+      <Files Directory="INSTALLFOLDER" Include="!(bindpath.bundle)\**" />
+
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+  </Package>
+</Wix>
