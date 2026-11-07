@@ -122,8 +122,10 @@ Die Builds enthalten keine Publisher-Signatur oder Apple-Notarisierung.
 Der GitHub-Actions-Workflow `.github/workflows/desktop.yml` baut und prüft alle drei
 Plattformen auf nativen Runnern bei Push, Pull Request und manuellem Start. Nach
 einem erfolgreichen Lauf können die Archive unter **Actions → Desktop builds →
-Artifacts** heruntergeladen werden; bei einem Tag `v*` werden sie zusätzlich an das
-GitHub-Release angehängt. Die Flutter-Version wird aus `mise.toml` gelesen.
+Artifacts** heruntergeladen werden. Bei einem Tag `v*` werden sie zusätzlich an das
+GitHub-Release angehängt; dessen Beschreibung verlinkt jede Datei samt Prüfsumme
+und Installationshinweis (`.github/scripts/release-notes.sh`), gefolgt von den
+automatisch erzeugten Release Notes. Die Flutter-Version wird aus `mise.toml` gelesen.
 
 ## Lizenz
 
