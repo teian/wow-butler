@@ -99,15 +99,20 @@ Pakete, Installer und ihre SHA-256-Prüfsummen liegen in `dist/`:
 
 | Plattform | Datei | Installation |
 | --- | --- | --- |
-| Debian/Ubuntu | `wow-butler_<version>-<build>_<arch>.deb` | `sudo apt install ./<datei>.deb` |
-| Fedora | `wow-butler-<version>-<build>.<arch>.rpm` | `sudo dnf install ./<datei>.rpm` |
-| Arch Linux | `wow-butler-<version>-<build>-<arch>.pkg.tar.zst` | `sudo pacman -U <datei>.pkg.tar.zst` |
+| Debian/Ubuntu | `wow-butler_<version>_<arch>.deb` | `sudo apt install ./<datei>.deb` |
+| Fedora | `wow-butler-<version>-1.<arch>.rpm` | `sudo dnf install ./<datei>.rpm` |
+| Arch Linux | `wow-butler-<version>-1-<arch>.pkg.tar.zst` | `sudo pacman -U <datei>.pkg.tar.zst` |
 | Linux (portabel) | `wow-butler-<version>-linux-<arch>.tar.gz` | entpacken, `wow-butler/wow_butler` starten |
 | Windows | `wow-butler-<version>-windows-<arch>-setup.exe` | Setup; pro Benutzer oder für alle Benutzer |
 | Windows | `wow-butler-<version>-windows-<arch>.msi` | MSI für alle Benutzer, z. B. für Softwareverteilung |
 | Windows (portabel) | `wow-butler-<version>-windows-<arch>.zip` | entpacken, `wow-butler/wow_butler.exe` starten |
 | macOS | `wow-butler-<version>-macos-<arch>.dmg` | `wow_butler.app` auf „Programme“ ziehen |
 | macOS | `wow-butler-<version>-macos-<arch>.zip` | `wow_butler.app` in „Programme“ verschieben |
+
+Die Version in `pubspec.yaml` ist eine reine SemVer-Version (`MAJOR.MINOR.PATCH`,
+optional `-PRERELEASE`) ohne Buildnummer; der Build bricht sonst ab. Die `-1` in den
+RPM- und Arch-Dateinamen ist die Paketrevision, die beide Formate verlangen, und
+gehört nicht zur App-Version.
 
 Die Linux-Pakete installieren die App nach `/usr/lib/wow-butler` mit dem Befehl
 `wow_butler`, Startmenü-Eintrag und Icons; sie hängen von GTK 3 ab und empfehlen

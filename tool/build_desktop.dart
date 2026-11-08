@@ -166,23 +166,30 @@ Future<void> main(List<String> args) async {
   }
 }
 
-/// pubspec `1.2.3-beta+4` as the pieces installers want: `1.2.3-beta` for
-/// display and Linux packages, `1.2.3` for Windows' numeric-only version
-/// fields and `4` as the package release.
+/// The pubspec version, a strict SemVer `1.2.3` or `1.2.3-beta.1` without
+/// build number, as the pieces installers want: the full version for display
+/// and Linux packages, `1.2.3` for Windows' numeric-only version fields.
 class _Version {
-  const _Version(this.display, this.numeric, this.build);
+  const _Version(this.display, this.numeric);
 
   factory _Version.parse(String version) {
-    final [display, ...rest] = version.split('+');
-    final numeric = RegExp(r'^\d+(\.\d+){0,3}').stringMatch(display);
-    if (numeric == null) _fail('Unsupported version: $version');
-    final build = rest.isEmpty ? '1' : rest.join('+');
-    return _Version(display, numeric, build);
+    final semver = RegExp(
+      r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)'
+      r'(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)'
+      r'(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?$',
+    );
+    final match = semver.firstMatch(version);
+    if (match == null) {
+      _fail(
+        'pubspec.yaml version "$version" is not a plain SemVer version '
+        '(MAJOR.MINOR.PATCH[-PRERELEASE], no build number).',
+      );
+    }
+    return _Version(version, '${match[1]}.${match[2]}.${match[3]}');
   }
 
   final String display;
   final String numeric;
-  final String build;
 }
 
 /// The tool from [envVar] if set, else the first existing [candidates]
@@ -215,7 +222,6 @@ Future<List<String>> _linuxPackages(
     'arch': arch == 'x64' ? 'amd64' : arch,
     'platform': 'linux',
     'version': version.display,
-    'release': version.build,
     'section': 'games',
     'priority': 'optional',
     'maintainer': 'Frank Gehann <fg@fgehann.de>',
