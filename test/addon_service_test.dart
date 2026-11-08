@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,6 +45,46 @@ void main() {
         p.join(tmp.path, 'x'),
       );
       expect(out.map(p.basename), ['MyAddon']);
+    });
+
+    test('treats backslash entry names as nested paths', () {
+      // Zips built with some Windows tools store `\` instead of `/`.
+      // ZipEncoder normalizes names on write, so patch the raw bytes to get
+      // an archive that really carries backslashes.
+      final archive = Archive()
+        ..add(ArchiveFile.string('BS/BS.toc', ''))
+        ..add(ArchiveFile.string('BS/Mod/core.lua', ''))
+        ..add(ArchiveFile.string('BS/Loc/deDE.lua', ''));
+      final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
+      final slash = '/'.codeUnitAt(0);
+      final backslash = r'\'.codeUnitAt(0);
+      for (final marker in ['BS/', 'Mod/']) {
+        final needle = marker.codeUnits;
+        for (var i = 0; i + needle.length <= bytes.length; i++) {
+          var hit = true;
+          for (var j = 0; j < needle.length && hit; j++) {
+            hit = bytes[i + j] == needle[j];
+          }
+          if (hit && bytes[i + needle.length - 1] == slash) {
+            bytes[i + needle.length - 1] = backslash;
+          }
+        }
+      }
+      final zipPath = p.join(tmp.path, 'bs.zip');
+      File(zipPath).writeAsBytesSync(bytes);
+      final decoded = ZipDecoder().decodeBytes(bytes);
+      expect(decoded.map((e) => e.name), contains(r'BS\Mod\core.lua'));
+
+      final out = extractAddonArchive(zipPath, p.join(tmp.path, 'x'));
+      expect(out.map(p.basename), ['BS']);
+      final root = out.single;
+      expect(File(p.join(root, 'BS.toc')).existsSync(), isTrue);
+      expect(File(p.join(root, 'Mod', 'core.lua')).existsSync(), isTrue);
+      expect(File(p.join(root, 'Loc', 'deDE.lua')).existsSync(), isTrue);
+      final names = Directory(p.join(tmp.path, 'x'))
+          .listSync(recursive: true)
+          .map((e) => p.basename(e.path));
+      expect(names.where((n) => n.contains(r'\')), isEmpty);
     });
 
     test('wraps loose files at the archive root', () {
