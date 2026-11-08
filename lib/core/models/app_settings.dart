@@ -158,6 +158,8 @@ class AppSettings {
     this.githubToken,
     this.updateCheckMinutes = 360,
     this.parallelDownloads = defaultParallelDownloads,
+    this.preferDownloadableSource = true,
+    this.downloadsDirectory,
     this.autoUpdate = true,
     this.checkOnStart = true,
     this.defaultChannel = ReleaseChannel.stable,
@@ -194,6 +196,14 @@ class AppSettings {
 
   static const defaultParallelDownloads = 5;
 
+  /// Addons whose primary source only allows website downloads switch to
+  /// another source that publishes them, unless the user picked the source.
+  final bool preferDownloadableSource;
+
+  /// Where the browser saves downloads; `null` uses the system default.
+  /// Watched for website-only downloads.
+  final String? downloadsDirectory;
+
   /// Install updates automatically (at start and on every check). Pinned,
   /// ignored and opted-out addons are left alone.
   final bool autoUpdate;
@@ -225,6 +235,8 @@ class AppSettings {
     String? githubToken,
     int? updateCheckMinutes,
     int? parallelDownloads,
+    bool? preferDownloadableSource,
+    String? downloadsDirectory,
     bool? autoUpdate,
     bool? checkOnStart,
     ReleaseChannel? defaultChannel,
@@ -243,6 +255,9 @@ class AppSettings {
     githubToken: githubToken ?? this.githubToken,
     updateCheckMinutes: updateCheckMinutes ?? this.updateCheckMinutes,
     parallelDownloads: parallelDownloads ?? this.parallelDownloads,
+    preferDownloadableSource:
+        preferDownloadableSource ?? this.preferDownloadableSource,
+    downloadsDirectory: downloadsDirectory ?? this.downloadsDirectory,
     autoUpdate: autoUpdate ?? this.autoUpdate,
     checkOnStart: checkOnStart ?? this.checkOnStart,
     defaultChannel: defaultChannel ?? this.defaultChannel,
@@ -262,6 +277,8 @@ class AppSettings {
     'githubToken': githubToken,
     'updateCheckMinutes': updateCheckMinutes,
     'parallelDownloads': parallelDownloads,
+    'preferDownloadableSource': preferDownloadableSource,
+    'downloadsDirectory': downloadsDirectory,
     'autoUpdate': autoUpdate,
     'checkOnStart': checkOnStart,
     'defaultChannel': defaultChannel.name,
@@ -303,6 +320,9 @@ class AppSettings {
         final int n when n >= 1 => n,
         _ => defaultParallelDownloads,
       },
+      preferDownloadableSource:
+          json['preferDownloadableSource'] as bool? ?? true,
+      downloadsDirectory: json['downloadsDirectory'] as String?,
       autoUpdate: json['autoUpdate'] as bool? ?? true,
       checkOnStart: json['checkOnStart'] as bool? ?? true,
       defaultChannel:

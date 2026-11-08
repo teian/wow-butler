@@ -43,13 +43,18 @@ class AddonService {
     required this.api,
     required this.sources,
     required this.defaultChannel,
-  });
+    bool Function()? preferDownloadable,
+  }) : preferDownloadable = preferDownloadable ?? (() => true);
 
   final ApiClient api;
   final SourceRegistry Function() sources;
 
   /// Channel for addons that have none yet (fresh installs and matches).
   final ReleaseChannel Function() defaultChannel;
+
+  /// Whether website-only addons switch to another source automatically
+  /// ([AppSettings.preferDownloadableSource]).
+  final bool Function() preferDownloadable;
 
   /// Reconciles [stored] with the folders on disk and identifies unknown
   /// folders through the active sources, in priority order.
@@ -74,8 +79,10 @@ class AddonService {
         // Entries without a source are re-identified on every sync: a new
         // key or source may be able to match them now. So are entries whose
         // source only allows website downloads, in case another source has
-        // them. Preferences survive through [previousByFolder].
-        if (!addon.isManaged || !addon.downloadsAllowed) continue;
+        // them, unless the user picked that source. Preferences survive
+        // through [previousByFolder].
+        if (!addon.isManaged) continue;
+        if (!addon.downloadsAllowed && !addon.manualSource) continue;
         final existing = addon.folders
             .map((f) => byName[f.toLowerCase()]?.name)
             .nonNulls
@@ -135,7 +142,25 @@ class AddonService {
         }
       }
     }
-    websiteOnly.forEach(take);
+    for (final match in websiteOnly) {
+      // Another source took the folders: remember this one as alternative.
+      final first = match.folders.first.toLowerCase();
+      final owner = result.indexWhere(
+        (a) => a.folders.any((f) => f.toLowerCase() == first),
+      );
+      if (owner < 0) {
+        take(match);
+        continue;
+      }
+      final addon = result[owner];
+      if (addon.remoteKey == match.addon.key) continue;
+      result[owner] = addon.copyWith(
+        alternatives: _withAlternative(
+          addon.alternatives,
+          AddonAlternative.of(match.addon),
+        ),
+      );
+    }
 
     // A website-only assignment (e.g. made by hand) that no source confirmed
     // again stays as it was instead of falling back to a local addon.
@@ -149,6 +174,7 @@ class AddonService {
 
     _addUnmanaged(result, remaining, previousByFolder);
     _refreshFromToc(result, byName);
+    await _fallBackToDownloadable(inst, result, warnings);
     result.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return AddonsResult(result, warnings);
   }
@@ -185,6 +211,11 @@ class AddonService {
       installedVersion: tocVersion ?? installed?.version,
       installedReleaseId: installed?.id,
       downloadsAllowed: remote.downloadsAllowed,
+      alternatives: [
+        for (final a in previous?.alternatives ?? const <AddonAlternative>[])
+          if (a.key != remote.key) a,
+      ],
+      alternativesCheckedAt: previous?.alternativesCheckedAt,
       installedAt: previous?.installedAt,
       channel: channel,
       autoUpdate: previous?.autoUpdate ?? true,
@@ -264,6 +295,185 @@ class AddonService {
             );
     }
   }
+
+  /// Website-only addons switch to another source that publishes them and
+  /// allows downloads, in source priority order. Other sources are searched
+  /// by name when none is known yet. Addons whose source the user picked
+  /// stay as they are.
+  Future<void> _fallBackToDownloadable(
+    WowInstallation inst,
+    List<InstalledAddon> addons,
+    List<String> warnings,
+  ) async {
+    if (!preferDownloadable()) return;
+    var searches = 0;
+    for (var i = 0; i < addons.length; i++) {
+      var addon = addons[i];
+      if (!addon.isManaged || addon.downloadsAllowed || addon.manualSource) {
+        continue;
+      }
+      final checked = addon.alternativesCheckedAt;
+      final stale =
+          checked == null ||
+          DateTime.now().difference(checked) > _alternativesMaxAge;
+      if (stale && searches < _maxAlternativeSearches) {
+        searches++;
+        addon = await withAlternatives(inst, addon, warnings: warnings);
+        addons[i] = addon;
+      }
+      final remote = await _downloadableAlternative(inst, addon);
+      if (remote != null) addons[i] = relink(addon, remote);
+    }
+  }
+
+  /// Website-only addons searched by name per sync.
+  static const _maxAlternativeSearches = 10;
+
+  /// How long a name search for alternatives stays valid.
+  static const _alternativesMaxAge = Duration(days: 7);
+
+  /// The first alternative of [addon] (in source priority order) that
+  /// allows downloads and has a release for its channel.
+  Future<RemoteAddon?> _downloadableAlternative(
+    WowInstallation inst,
+    InstalledAddon addon,
+  ) async {
+    final registry = sources();
+    final active = registry.active.map((s) => s.id).toList();
+    final candidates =
+        addon.alternatives
+            .where((a) => a.downloadsAllowed && active.contains(a.source))
+            .toList()
+          ..sort(
+            (a, b) =>
+                active.indexOf(a.source).compareTo(active.indexOf(b.source)),
+          );
+    for (final alt in candidates) {
+      try {
+        final remote = await registry[alt.source].getById(
+          alt.externalId,
+          inst.flavor,
+        );
+        if (remote != null &&
+            remote.downloadsAllowed &&
+            remote.latestFor(addon.channel) != null) {
+          return remote;
+        }
+      } on Object {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  /// Searches the other active sources for [addon] by name and returns it
+  /// with every hit of the same name added to its alternatives. The search
+  /// only counts as done when every source answered, so a failed source is
+  /// asked again on the next sync.
+  Future<InstalledAddon> withAlternatives(
+    WowInstallation inst,
+    InstalledAddon addon, {
+    List<String>? warnings,
+  }) async {
+    var failed = false;
+    final hits = await Future.wait([
+      for (final source in sources().active)
+        if (source.supportsTextSearch && source.id != addon.source)
+          () async {
+            try {
+              return await source.search(addon.name, inst.flavor);
+            } on Object catch (e) {
+              failed = true;
+              warnings?.add('${source.id.label}: $e');
+              return const <RemoteAddon>[];
+            }
+          }(),
+    ]);
+    var alternatives = addon.alternatives;
+    for (final remote in hits.expand((h) => h)) {
+      if (remote.key == addon.remoteKey) continue;
+      if (!isSameAddon(addon, remote)) continue;
+      alternatives = _withAlternative(
+        alternatives,
+        AddonAlternative.of(remote),
+      );
+    }
+    return addon.copyWith(
+      alternatives: alternatives,
+      alternativesCheckedAt: failed ? null : DateTime.now(),
+    );
+  }
+
+  /// Whether a search hit is the same addon: same name (ignoring case and
+  /// punctuation) and, when both sides name authors, a shared author.
+  static bool isSameAddon(InstalledAddon addon, RemoteAddon remote) {
+    String norm(String s) =>
+        s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (norm(addon.name) != norm(remote.name)) return false;
+    Set<String> authors(String? s) => {
+      for (final part in (s ?? '').toLowerCase().split(RegExp(r'[^a-z0-9]+')))
+        if (part.length >= 3) part,
+    };
+    final a = authors(addon.author), b = authors(remote.author);
+    return a.isEmpty || b.isEmpty || a.intersection(b).isNotEmpty;
+  }
+
+  /// [addon] linked to [remote] without reinstalling it. The previous source
+  /// becomes an alternative. The installed release is recognized by version
+  /// when possible; otherwise the next update installs the current release.
+  InstalledAddon relink(
+    InstalledAddon addon,
+    RemoteAddon remote, {
+    bool manual = false,
+  }) {
+    String norm(String? v) => (v ?? '').replaceFirst(RegExp(r'^[vV]'), '');
+    final sameSource = addon.remoteKey == remote.key;
+    final installed = sameSource
+        ? null
+        : remote.releases
+              .where((r) => norm(r.version) == norm(addon.installedVersion))
+              .firstOrNull;
+    var alternatives = [
+      for (final a in addon.alternatives)
+        if (a.key != remote.key) a,
+    ];
+    if (addon.isManaged && !sameSource) {
+      alternatives = _withAlternative(
+        alternatives,
+        AddonAlternative(
+          source: addon.source!,
+          externalId: addon.externalId!,
+          name: addon.name,
+          downloadsAllowed: addon.downloadsAllowed,
+        ),
+      );
+    }
+    return addon.copyWith(
+      name: remote.name,
+      source: remote.source,
+      externalId: remote.externalId,
+      downloadsAllowed: remote.downloadsAllowed,
+      manualSource: manual,
+      alternatives: alternatives,
+      author: remote.author,
+      summary: remote.summary,
+      thumbnailUrl: remote.thumbnailUrl,
+      websiteUrl: remote.websiteUrl,
+      installedReleaseId: installed?.id,
+      clearInstalledReleaseId: !sameSource && installed == null,
+      latestRelease: remote.latestFor(addon.channel),
+      clearLatestRelease: remote.latestFor(addon.channel) == null,
+    );
+  }
+
+  static List<AddonAlternative> _withAlternative(
+    List<AddonAlternative> list,
+    AddonAlternative alt,
+  ) => [
+    for (final a in list)
+      if (a.key != alt.key) a,
+    alt,
+  ];
 
   /// Refreshes [InstalledAddon.latestRelease] for all managed addons.
   Future<AddonsResult> checkUpdates(
@@ -358,8 +568,38 @@ class AddonService {
     if (release.downloadUrl.isEmpty) {
       throw AddonException('${remote.name}: $websiteOnlyMessage');
     }
-
     final source = sources()[remote.source];
+    return _stage(inst, remote, release, onProgress, (zip) async {
+      final request = source.downloadRequest(release);
+      await api.download(
+        request.uri,
+        zip,
+        headers: request.headers,
+        onProgress: (v) => onProgress?.call(v * 0.8),
+      );
+    });
+  }
+
+  /// Like [prepare], but takes the archive from [archive] instead of
+  /// downloading it, e.g. a file the user downloaded in the browser.
+  Future<PreparedInstall> prepareFile(
+    WowInstallation inst, {
+    required RemoteAddon remote,
+    required AddonRelease release,
+    required File archive,
+    ProgressCallback? onProgress,
+  }) => _stage(inst, remote, release, onProgress, (zip) async {
+    await archive.copy(zip.path);
+    onProgress?.call(0.8);
+  });
+
+  Future<PreparedInstall> _stage(
+    WowInstallation inst,
+    RemoteAddon remote,
+    AddonRelease release,
+    ProgressCallback? onProgress,
+    Future<void> Function(File zip) fetch,
+  ) async {
     // Staging lives next to AddOns so the final move is a cheap rename on
     // the same filesystem.
     final staging = Directory(
@@ -370,13 +610,7 @@ class AddonService {
 
     try {
       final zip = File(p.join(staging.path, 'download.zip'));
-      final request = source.downloadRequest(release);
-      await api.download(
-        request.uri,
-        zip,
-        headers: request.headers,
-        onProgress: (v) => onProgress?.call(v * 0.8),
-      );
+      await fetch(zip);
 
       final extractDir = p.join(staging.path, 'extract');
       final folders = await _extractInIsolate(zip.path, extractDir);
@@ -405,8 +639,8 @@ class AddonService {
     ProgressCallback? onProgress,
     Set<String>? visited,
   }) async {
-    final remote = prepared.remote;
-    final release = prepared.release;
+    final remote = prepared.remote!;
+    final release = prepared.release!;
     visited ??= {};
     visited.add(remote.key);
     try {
@@ -433,6 +667,9 @@ class AddonService {
       final effectiveChannel = channel ?? existing?.channel ?? defaultChannel();
       final installed = InstalledAddon(
         id: existing?.id ?? newId(),
+        manualSource: existing?.manualSource ?? false,
+        alternatives: existing?.alternatives ?? const [],
+        alternativesCheckedAt: existing?.alternativesCheckedAt,
         name: remote.name,
         folders: orderFolders(newNames, preferred: existing?.folders.first),
         source: remote.source,
@@ -496,6 +733,39 @@ class AddonService {
       return result;
     } finally {
       await prepared.discard();
+    }
+  }
+
+  /// Extracts the addon archive [archive] into AddOns, replacing folders of
+  /// the same name, and returns the folder names. The caller rescans to
+  /// identify the addon.
+  Future<List<String>> installArchive(
+    WowInstallation inst,
+    File archive,
+  ) async {
+    final staging = Directory(
+      p.join(inst.interfacePath, '.wow-butler-staging', newId()),
+    );
+    await staging.create(recursive: true);
+    try {
+      final folders = await _extractInIsolate(
+        archive.path,
+        p.join(staging.path, 'extract'),
+      );
+      if (folders.isEmpty) {
+        throw AddonException(
+          '${p.basename(archive.path)}: Archiv enthält keine Addon-Ordner.',
+        );
+      }
+      await Directory(inst.addonsPath).create(recursive: true);
+      for (final folder in folders) {
+        final target = Directory(p.join(inst.addonsPath, p.basename(folder)));
+        if (await target.exists()) await target.delete(recursive: true);
+        await _move(folder, target.path);
+      }
+      return folders.map(p.basename).toList();
+    } finally {
+      await PreparedInstall._(null, null, staging).discard();
     }
   }
 
@@ -581,8 +851,9 @@ class AddonService {
 
 /// Shown when an author disallows downloads through third-party tools.
 const websiteOnlyMessage =
-    'Der Autor erlaubt keine Downloads über Drittanbieter-Programme. '
-    'Bitte über die Website installieren.';
+    'Der Autor erlaubt keine direkten Downloads über Drittanbieter-Programme. '
+    'Lade die Datei über die Website herunter; WoW Butler installiert sie '
+    'danach.';
 
 /// What an update of an addon would install.
 class UpdatePlan {
@@ -600,8 +871,9 @@ class UpdatePlan {
 class PreparedInstall {
   PreparedInstall._(this.remote, this.release, this._staging);
 
-  final RemoteAddon remote;
-  final AddonRelease release;
+  /// `null` only for the internal staging of [AddonService.installArchive].
+  final RemoteAddon? remote;
+  final AddonRelease? release;
   final Directory _staging;
   List<String> _folders = const [];
 

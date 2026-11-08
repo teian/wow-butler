@@ -318,7 +318,10 @@ class _SourcesCard extends ConsumerWidget {
 
     return SectionCard(
       title: 'Quellen',
-      subtitle: 'Reihenfolge = Priorität beim Zuordnen installierter Addons',
+      subtitle:
+          'Reihenfolge per Ziehen ändern: Die oberste Quelle ist primär. Sie '
+          'gilt beim Zuordnen installierter Addons und beim Ausweichen auf '
+          'andere Quellen; pro Addon in der Detailansicht überschreibbar.',
       children: [
         ReorderableListView(
           shrinkWrap: true,
@@ -397,6 +400,51 @@ class _SourcesCard extends ConsumerWidget {
                 ),
               ),
           ],
+        ),
+        SettingRow(
+          label: 'Auf andere Quellen ausweichen',
+          hint:
+              'Erlaubt der Autor keine direkten Downloads (z. B. bei '
+              'CurseForge), lädt WoW Butler das Addon von der nächsten Quelle '
+              'in der Reihenfolge, die es führt',
+          trailing: WToggle(
+            value: s.preferDownloadableSource,
+            onChanged: (v) =>
+                _ctrl(ref)
+                    .update((x) => x.copyWith(preferDownloadableSource: v)),
+          ),
+        ),
+        SettingRow(
+          label: 'Download-Ordner des Browsers',
+          hint:
+              'Hier wartet WoW Butler auf Dateien, die über die Website '
+              'geladen werden',
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: PathChip(
+                  ref.watch(downloadsDirectoryProvider).value ??
+                      'Nicht festgelegt',
+                ),
+              ),
+              const SizedBox(width: 8),
+              WButton(
+                small: true,
+                label: 'Wählen',
+                onPressed: () async {
+                  final dir = await FilePicker.getDirectoryPath(
+                    dialogTitle: 'Download-Ordner des Browsers',
+                  );
+                  if (dir != null) {
+                    _ctrl(ref)
+                        .update((x) => x.copyWith(downloadsDirectory: dir));
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );

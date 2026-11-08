@@ -5,6 +5,8 @@ import '../../core/external_addons.dart';
 import '../../core/models/addon.dart';
 import '../../core/models/game_flavor.dart';
 import '../../core/models/wow_installation.dart';
+import '../../services/addon_service.dart' show websiteOnlyMessage;
+import '../../state/activity_log.dart';
 import '../../state/addons_controller.dart';
 import '../../state/detail_providers.dart';
 import '../../state/nav_controller.dart';
@@ -14,6 +16,7 @@ import '../tokens.dart';
 import '../widgets/addon_media.dart';
 import '../widgets/assign_source_dialog.dart';
 import '../widgets/primitives.dart';
+import '../widgets/website_install_dialog.dart';
 import 'my_addons_page.dart' show gameVersionOf;
 
 class AddonDetailPage extends ConsumerWidget {
@@ -116,7 +119,15 @@ class AddonDetailPage extends ConsumerWidget {
                       ? 'Update auf ${addon.source?.label ?? 'Website'} laden'
                       : 'Auf ${addon.source?.label ?? 'Website'} öffnen',
                   icon: Icons.open_in_new_rounded,
-                  onPressed: () => openUrl(addon.websiteUrl),
+                  tooltip: addon.updateNeedsWebsite ? websiteOnlyMessage : null,
+                  onPressed: addon.updateNeedsWebsite
+                      ? () => showWebsiteUpdateDialog(
+                          context,
+                          ref,
+                          inst: inst,
+                          addon: addon,
+                        )
+                      : () => openUrl(addon.websiteUrl),
                 ),
               ],
               if (addon.hasUpdate &&
@@ -170,6 +181,10 @@ class AddonDetailPage extends ConsumerWidget {
                 child: Column(
                   children: [
                     _Manage(inst: inst, addon: addon),
+                    if (addon.isManaged) ...[
+                      const SizedBox(height: 16),
+                      _Sources(inst: inst, addon: addon),
+                    ],
                     if (addon.isManaged) ...[
                       const SizedBox(height: 16),
                       Consumer(
@@ -866,6 +881,137 @@ class _ToggleRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           WToggle(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
+/// The addon's primary source and the other sources that publish it; any
+/// of them can be made the primary source.
+class _Sources extends ConsumerStatefulWidget {
+  const _Sources({required this.inst, required this.addon});
+
+  final WowInstallation inst;
+  final InstalledAddon addon;
+
+  @override
+  ConsumerState<_Sources> createState() => _SourcesState();
+}
+
+class _SourcesState extends ConsumerState<_Sources> {
+  bool _searching = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = context.w;
+    final addon = widget.addon;
+    final ctrl = ref.read(addonsProvider(widget.inst.id).notifier);
+    final priority = ref.watch(
+      settingsProvider.select((s) => s.sourcePriority),
+    );
+    final alternatives = [...addon.alternatives]
+      ..sort(
+        (a, b) =>
+            priority.indexOf(a.source).compareTo(priority.indexOf(b.source)),
+      );
+
+    Widget row({
+      required AddonSourceId source,
+      required bool downloadsAllowed,
+      required Widget trailing,
+    }) => Padding(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+      child: Row(
+        children: [
+          SourceBadge(source, width: 84),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              downloadsAllowed ? 'Download in der App' : 'Nur über Website',
+              style: TextStyle(fontSize: 12, color: w.muted),
+            ),
+          ),
+          trailing,
+        ],
+      ),
+    );
+
+    return WCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+            child: Text('QUELLEN', style: WText.caps(w.muted)),
+          ),
+          row(
+            source: addon.source!,
+            downloadsAllowed: addon.downloadsAllowed,
+            trailing: Tooltip(
+              message: addon.manualSource
+                  ? 'Von dir gewählt; wird nicht automatisch gewechselt'
+                  : 'Automatisch gewählt',
+              child: Text(
+                addon.manualSource ? 'PRIMÄR · FEST' : 'PRIMÄR',
+                style: WText.caps(w.fg),
+              ),
+            ),
+          ),
+          for (final alt in alternatives)
+            row(
+              source: alt.source,
+              downloadsAllowed: alt.downloadsAllowed,
+              trailing: WButton(
+                label: 'Als primär',
+                small: true,
+                tooltip: 'Updates künftig von ${alt.source.label} laden',
+                onPressed: () => ctrl.setPrimarySource(addon, alt),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: WButton(
+                    label: _searching ? 'Suche …' : 'Andere Quellen suchen',
+                    icon: Icons.search_rounded,
+                    small: true,
+                    expand: true,
+                    onPressed: _searching
+                        ? null
+                        : () async {
+                            setState(() => _searching = true);
+                            final count = await ctrl.findAlternatives(addon);
+                            if (!mounted) return;
+                            setState(() => _searching = false);
+                            if (count == 0) {
+                              ref
+                                  .read(activityProvider.notifier)
+                                  .info(
+                                    'Keine andere Quelle führt ${addon.name}.',
+                                  );
+                            }
+                          },
+                  ),
+                ),
+                if (addon.manualSource) ...[
+                  const SizedBox(width: 8),
+                  WButton(
+                    label: 'Automatisch',
+                    small: true,
+                    tooltip:
+                        'Festlegung aufheben. Die aktuelle Quelle bleibt; '
+                        'erlaubt sie nur Downloads über die Website, wechselt '
+                        'WoW Butler automatisch zur nächsten Quelle in der '
+                        'Reihenfolge der Einstellungen.',
+                    onPressed: () => ctrl.resetPrimarySource(addon),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

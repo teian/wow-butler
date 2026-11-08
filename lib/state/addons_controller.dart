@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -360,10 +361,13 @@ class AddonsController extends Notifier<AddonsState> {
   }
 
   /// Installs [release]; returns whether it succeeded (failures are logged).
+  /// With [archive], the release is taken from that file (downloaded by the
+  /// user in the browser) instead of being downloaded.
   Future<bool> install(
     RemoteAddon remote,
     AddonRelease release, {
     ReleaseChannel? channel,
+    File? archive,
   }) async {
     final inst = _inst;
     if (inst == null) return false;
@@ -376,14 +380,22 @@ class AddonsController extends Notifier<AddonsState> {
     progress(0);
     final service = ref.read(addonServiceProvider);
     try {
-      final prepared = await _downloads.run(
-        () => service.prepare(
-          inst,
-          remote: remote,
-          release: release,
-          onProgress: progress,
-        ),
-      );
+      final prepared = archive != null
+          ? await service.prepareFile(
+              inst,
+              remote: remote,
+              release: release,
+              archive: archive,
+              onProgress: progress,
+            )
+          : await _downloads.run(
+              () => service.prepare(
+                inst,
+                remote: remote,
+                release: release,
+                onProgress: progress,
+              ),
+            );
       await _serial(() async {
         final updated = await service.apply(
           inst,
@@ -448,32 +460,89 @@ class AddonsController extends Notifier<AddonsState> {
   Future<void> setExternal(Iterable<String> ids, bool value) =>
       _modify(ids, (a) => a.isManaged ? a : a.copyWith(external: value));
 
-  /// Links an installed addon to [remote] without reinstalling it. The
-  /// installed release is recognized by version when possible; otherwise
-  /// the next update simply installs the source's current release.
+  /// Links an installed addon to [remote] without reinstalling it and
+  /// makes it the addon's primary source; the previous source stays as an
+  /// alternative. The installed release is recognized by version when
+  /// possible; otherwise the next update installs the current release.
   Future<void> assignSource(InstalledAddon addon, RemoteAddon remote) async {
-    String norm(String? v) => (v ?? '').replaceFirst(RegExp(r'^[vV]'), '');
-    final installed = addon.installedVersion == null
-        ? null
-        : remote.releases
-              .where((r) => norm(r.version) == norm(addon.installedVersion))
-              .firstOrNull;
-    await _modify(
-      [addon.id],
-      (a) => a.copyWith(
-        name: remote.name,
-        source: remote.source,
-        externalId: remote.externalId,
-        downloadsAllowed: remote.downloadsAllowed,
-        author: remote.author,
-        summary: remote.summary,
-        thumbnailUrl: remote.thumbnailUrl,
-        websiteUrl: remote.websiteUrl,
-        installedReleaseId: installed?.id,
-        latestRelease: remote.latestFor(a.channel),
-      ),
-    );
+    final service = ref.read(addonServiceProvider);
+    await _modify([addon.id], (a) => service.relink(a, remote, manual: true));
     _log.success('${remote.name} ist jetzt ${remote.source.label} zugeordnet');
+  }
+
+  /// Makes [alternative] the primary source of [addon].
+  Future<void> setPrimarySource(
+    InstalledAddon addon,
+    AddonAlternative alternative,
+  ) async {
+    final inst = _inst;
+    if (inst == null) return;
+    final source = ref.read(sourcesProvider)[alternative.source];
+    if (!source.isAvailable) {
+      _log.error('${source.id.label}: ${source.unavailableReason}');
+      return;
+    }
+    try {
+      final remote = await source.getById(alternative.externalId, inst.flavor);
+      if (remote == null) {
+        _log.error(
+          '${alternative.name} ist auf ${source.id.label} nicht mehr '
+          'verfügbar.',
+        );
+        return;
+      }
+      await assignSource(addon, remote);
+    } catch (e) {
+      _log.error('${addon.name}: $e');
+    }
+  }
+
+  /// Lets syncs switch [addon] to another source again, as if the user had
+  /// never picked one.
+  Future<void> resetPrimarySource(InstalledAddon addon) async {
+    await _modify([addon.id], (a) => a.copyWith(manualSource: false));
+    await rescan();
+  }
+
+  /// Searches the other sources for [addon] and stores the hits as
+  /// alternatives; returns how many alternatives it has afterwards.
+  Future<int> findAlternatives(InstalledAddon addon) async {
+    final inst = _inst;
+    if (inst == null) return 0;
+    try {
+      final found = await ref
+          .read(addonServiceProvider)
+          .withAlternatives(inst, addon);
+      await _modify(
+        [addon.id],
+        (a) => a.copyWith(
+          alternatives: found.alternatives,
+          alternativesCheckedAt: found.alternativesCheckedAt,
+        ),
+      );
+      return found.alternatives.length;
+    } catch (e) {
+      _log.error('${addon.name}: $e');
+      return 0;
+    }
+  }
+
+  /// Installs the addon archive [archive] (e.g. a zip downloaded by hand)
+  /// and identifies it with the next scan.
+  Future<bool> installArchive(File archive) async {
+    final inst = _inst;
+    if (inst == null) return false;
+    try {
+      final folders = await _serial(
+        () => ref.read(addonServiceProvider).installArchive(inst, archive),
+      );
+      await rescan();
+      _log.success('${folders.join(', ')} installiert');
+      return true;
+    } catch (e) {
+      _log.error('$e');
+      return false;
+    }
   }
 
   Future<void> _modify(
