@@ -1002,8 +1002,10 @@ class _SourcesState extends ConsumerState<_Sources> {
                     label: 'Automatisch',
                     small: true,
                     tooltip:
-                        'Quelle wieder nach der Reihenfolge in den '
-                        'Einstellungen wählen',
+                        'Festlegung aufheben. Die aktuelle Quelle bleibt; '
+                        'erlaubt sie nur Downloads über die Website, wechselt '
+                        'WoW Butler automatisch zur nächsten Quelle in der '
+                        'Reihenfolge der Einstellungen.',
                     onPressed: () => ctrl.resetPrimarySource(addon),
                   ),
                 ],

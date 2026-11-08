@@ -91,42 +91,48 @@ void main() {
   });
   tearDown(() => tmp.deleteSync(recursive: true));
 
-  ApiClient api({String hubAuthor = 'plusmouse', List<String>? searches}) =>
-      ApiClient(
-        client: MockClient((request) async {
-          final url = request.url;
-          Object? body;
-          if (url.host == 'api.curseforge.com') {
-            if (url.path.contains('/fingerprints/')) {
-              body = {
-                'data': {'exactMatches': <Object>[]},
-              };
-            } else if (url.path.endsWith('/v1/mods')) {
-              body = {
-                'data': [_cfAuctionator()],
-              };
-            } else if (url.path.endsWith('/v1/mods/7')) {
-              body = {'data': _cfAuctionator()};
-            } else if (url.path.endsWith('/mods/search')) {
-              body = {'data': <Object>[]};
-            }
-          } else if (url.host == 'hub.wowup.io') {
-            if (url.path.endsWith('/addons/fingerprint')) {
-              body = {'exactMatches': <Object>[]};
-            } else if (url.path.contains('/addons/search/')) {
-              searches?.add(url.queryParameters['query'] ?? '');
-              body = {
-                'addons': [_hubAuctionator(author: hubAuthor)],
-              };
-            } else if (url.path.endsWith('/addons/99')) {
-              body = {'addon': _hubAuctionator(author: hubAuthor)};
-            }
-          }
-          return body == null
-              ? http.Response('not found', 404)
-              : http.Response(jsonEncode(body), 200);
-        }),
-      );
+  ApiClient api({
+    String hubAuthor = 'plusmouse',
+    List<String>? searches,
+    bool hubSearchFails = false,
+  }) => ApiClient(
+    client: MockClient((request) async {
+      final url = request.url;
+      if (hubSearchFails && url.path.contains('/addons/search/')) {
+        return http.Response('unavailable', 503);
+      }
+      Object? body;
+      if (url.host == 'api.curseforge.com') {
+        if (url.path.contains('/fingerprints/')) {
+          body = {
+            'data': {'exactMatches': <Object>[]},
+          };
+        } else if (url.path.endsWith('/v1/mods')) {
+          body = {
+            'data': [_cfAuctionator()],
+          };
+        } else if (url.path.endsWith('/v1/mods/7')) {
+          body = {'data': _cfAuctionator()};
+        } else if (url.path.endsWith('/mods/search')) {
+          body = {'data': <Object>[]};
+        }
+      } else if (url.host == 'hub.wowup.io') {
+        if (url.path.endsWith('/addons/fingerprint')) {
+          body = {'exactMatches': <Object>[]};
+        } else if (url.path.contains('/addons/search/')) {
+          searches?.add(url.queryParameters['query'] ?? '');
+          body = {
+            'addons': [_hubAuctionator(author: hubAuthor)],
+          };
+        } else if (url.path.endsWith('/addons/99')) {
+          body = {'addon': _hubAuctionator(author: hubAuthor)};
+        }
+      }
+      return body == null
+          ? http.Response('not found', 404)
+          : http.Response(jsonEncode(body), 200);
+    }),
+  );
 
   AddonService service(ApiClient api, {bool prefer = true}) {
     final settings = AppSettings(
@@ -202,6 +208,17 @@ void main() {
     expect(again.source, AddonSourceId.curseforge);
     expect(again.manualSource, isTrue);
     expect(again.alternatives.map((a) => a.key), ['wowup:99']);
+  });
+
+  test('searches again after a source failed', () async {
+    final client = api(hubSearchFails: true);
+    final result = await service(client).sync(inst, const []);
+    client.close();
+
+    final addon = result.addons.single;
+    expect(addon.source, AddonSourceId.curseforge);
+    expect(addon.alternativesCheckedAt, isNull);
+    expect(result.warnings, isNotEmpty);
   });
 
   test('ignores a namesake by another author', () async {

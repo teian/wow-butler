@@ -367,12 +367,15 @@ class AddonService {
   }
 
   /// Searches the other active sources for [addon] by name and returns it
-  /// with every hit of the same name added to its alternatives.
+  /// with every hit of the same name added to its alternatives. The search
+  /// only counts as done when every source answered, so a failed source is
+  /// asked again on the next sync.
   Future<InstalledAddon> withAlternatives(
     WowInstallation inst,
     InstalledAddon addon, {
     List<String>? warnings,
   }) async {
+    var failed = false;
     final hits = await Future.wait([
       for (final source in sources().active)
         if (source.supportsTextSearch && source.id != addon.source)
@@ -380,6 +383,7 @@ class AddonService {
             try {
               return await source.search(addon.name, inst.flavor);
             } on Object catch (e) {
+              failed = true;
               warnings?.add('${source.id.label}: $e');
               return const <RemoteAddon>[];
             }
@@ -396,7 +400,7 @@ class AddonService {
     }
     return addon.copyWith(
       alternatives: alternatives,
-      alternativesCheckedAt: DateTime.now(),
+      alternativesCheckedAt: failed ? null : DateTime.now(),
     );
   }
 
