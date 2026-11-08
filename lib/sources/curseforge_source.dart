@@ -457,12 +457,21 @@ class CurseForgeSource extends AddonSource {
     );
   }
 
+  /// The file's download page; it starts the download in the browser.
+  @override
+  String? websiteDownloadUrl(RemoteAddon addon, AddonRelease release) {
+    final page = addon.websiteUrl;
+    if (page == null || page.isEmpty) return null;
+    final base = page.endsWith('/') ? page.substring(0, page.length - 1) : page;
+    return '$base/download/${release.id}';
+  }
+
   AddonRelease? _toRelease(Map<String, dynamic> f) {
     final fileId = f.integer('id');
     if (fileId == null) return null;
     final fileName = f.str('fileName') ?? '';
     // A missing URL means the author opted out of third-party distribution.
-    // We respect that; the installer reports it instead of downloading.
+    // The app then sends the user to the download page instead.
     final url = f.str('downloadUrl') ?? '';
     return AddonRelease(
       id: '$fileId',

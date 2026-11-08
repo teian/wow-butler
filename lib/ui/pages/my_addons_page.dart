@@ -1,15 +1,20 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/addon.dart';
 import '../../core/models/game_flavor.dart';
 import '../../core/models/wow_installation.dart';
+import '../../services/addon_service.dart' show websiteOnlyMessage;
 import '../../state/addons_controller.dart';
 import '../../state/nav_controller.dart';
 import '../../state/settings_controller.dart';
 import '../format.dart';
 import '../tokens.dart';
 import '../widgets/primitives.dart';
+import '../widgets/website_install_dialog.dart';
 
 enum _Filter { all, updates, pinned, ignored, external, websiteOnly }
 
@@ -371,9 +376,10 @@ class _WebsiteOnlyNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) => WNotice(
     '${count == 1 ? 'Ein Addon gibt' : '$count Addons gibt'} es nur über die '
-    'Website: Die Autoren erlauben keine Downloads über '
-    'Drittanbieter-Programme, und keine andere Quelle führt sie. Updates '
-    'werden angezeigt, die Installation erfolgt über „Website“.',
+    'Website: Die Autoren erlauben keine direkten Downloads über '
+    'Drittanbieter-Programme, und keine andere Quelle führt sie. Mit '
+    '„Website“ lädst du ein Update im Browser herunter; WoW Butler '
+    'installiert es danach automatisch.',
     action: WButton(label: 'Anzeigen', small: true, onPressed: onShow),
   );
 }
@@ -626,7 +632,9 @@ class _AddonRow extends ConsumerWidget {
         icon: Icons.open_in_new_rounded,
         kind: WButtonKind.outlineBlue,
         small: true,
-        onPressed: () => openUrl(addon.websiteUrl),
+        tooltip: websiteOnlyMessage,
+        onPressed: () =>
+            showWebsiteUpdateDialog(context, ref, inst: inst, addon: addon),
       );
     }
     if (addon.hasUpdate) {
@@ -700,6 +708,19 @@ class _ScanMenu extends ConsumerWidget {
           leadingIcon: const Icon(Icons.auto_fix_high_outlined, size: 18),
           onPressed: () => ctrl.rescan(rematch: true),
           child: const Text('Alle Addons neu zuordnen'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.unarchive_outlined, size: 18),
+          onPressed: () async {
+            final picked = await FilePicker.pickFile(
+              dialogTitle: 'Addon-Archiv installieren',
+              type: FileType.custom,
+              allowedExtensions: const ['zip'],
+            );
+            final path = picked?.path;
+            if (path != null) await ctrl.installArchive(File(path));
+          },
+          child: const Text('ZIP-Datei installieren …'),
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.open_in_new_rounded, size: 18),

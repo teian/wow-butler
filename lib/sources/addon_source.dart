@@ -76,6 +76,11 @@ abstract class AddonSource {
   Future<String?> changelog(String externalId, AddonRelease release) async =>
       release.notes;
 
+  /// The page where a user downloads [release] in the browser, for addons
+  /// whose author disallows downloads through third-party tools.
+  String? websiteDownloadUrl(RemoteAddon addon, AddonRelease release) =>
+      addon.websiteUrl;
+
   /// The request used to download [release]; adds auth where needed.
   ({Uri uri, Map<String, String> headers}) downloadRequest(
     AddonRelease release,

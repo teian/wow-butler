@@ -13,6 +13,7 @@ import '../../state/settings_controller.dart';
 import '../format.dart';
 import '../tokens.dart';
 import '../widgets/primitives.dart';
+import '../widgets/website_install_dialog.dart';
 
 class DiscoverPage extends ConsumerStatefulWidget {
   const DiscoverPage({super.key});
@@ -317,13 +318,19 @@ class _ResultCard extends ConsumerWidget {
           ],
         ),
       );
-    } else if (!addon.downloadsAllowed) {
-      action = const WButton(
+    } else if (!addon.downloadsAllowed && release != null) {
+      action = WButton(
         kind: WButtonKind.blue,
         small: true,
-        icon: Icons.block_rounded,
-        label: 'Nur über Website',
+        icon: Icons.open_in_new_rounded,
+        label: 'Über Website installieren',
         tooltip: websiteOnlyMessage,
+        onPressed: () => showWebsiteInstallDialog(
+          context,
+          inst: inst,
+          remote: addon,
+          release: release,
+        ),
       );
     } else if (release == null) {
       action = Tooltip(

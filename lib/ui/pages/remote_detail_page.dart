@@ -15,6 +15,7 @@ import '../theme.dart';
 import '../tokens.dart';
 import '../widgets/addon_media.dart';
 import '../widgets/primitives.dart';
+import '../widgets/website_install_dialog.dart';
 
 /// Detail page of an addon found under "Entdecken".
 class RemoteDetailPage extends ConsumerStatefulWidget {
@@ -67,11 +68,12 @@ class _RemoteDetailPageState extends ConsumerState<RemoteDetailPage> {
           if (!addon.downloadsAllowed) ...[
             const SizedBox(height: 16),
             WNotice(
-              'Der Autor von ${addon.name} hat Downloads über '
-              'Drittanbieter-Programme wie WoW Butler abgeschaltet. Lade das '
-              'Addon über „Auf ${addon.source.label} öffnen“ herunter; nach '
-              'der Installation erkennt WoW Butler es und zeigt Updates an.',
-              title: 'Installation nur über die Website.',
+              'Der Autor von ${addon.name} hat direkte Downloads über '
+              'Drittanbieter-Programme wie WoW Butler abgeschaltet. Über '
+              '„Über Website installieren“ lädst du die Datei im Browser '
+              'herunter; WoW Butler installiert sie danach automatisch und '
+              'zeigt weiter Updates an.',
+              title: 'Download über die Website.',
             ),
           ],
           const SizedBox(height: 20),
@@ -174,12 +176,18 @@ class _Header extends ConsumerWidget {
           ],
         ),
       );
-    } else if (!addon.downloadsAllowed) {
-      action = const WButton(
+    } else if (!addon.downloadsAllowed && release != null) {
+      action = WButton(
         kind: WButtonKind.primary,
-        icon: Icons.block_rounded,
-        label: 'Installieren',
+        icon: Icons.open_in_new_rounded,
+        label: 'Über Website installieren',
         tooltip: websiteOnlyMessage,
+        onPressed: () => showWebsiteInstallDialog(
+          context,
+          inst: inst,
+          remote: addon,
+          release: release,
+        ),
       );
     } else if (release == null) {
       action = Text(

@@ -139,6 +139,50 @@ class RemoteAddon {
   }
 }
 
+/// Another source that publishes the same addon as an installed one; the
+/// user can switch to it, and website-only addons fall back to it.
+class AddonAlternative {
+  const AddonAlternative({
+    required this.source,
+    required this.externalId,
+    required this.name,
+    this.downloadsAllowed = true,
+  });
+
+  factory AddonAlternative.of(RemoteAddon remote) => AddonAlternative(
+    source: remote.source,
+    externalId: remote.externalId,
+    name: remote.name,
+    downloadsAllowed: remote.downloadsAllowed,
+  );
+
+  final AddonSourceId source;
+  final String externalId;
+  final String name;
+  final bool downloadsAllowed;
+
+  String get key => '${source.name}:$externalId';
+
+  Map<String, dynamic> toJson() => {
+    'source': source.name,
+    'externalId': externalId,
+    'name': name,
+    'downloadsAllowed': downloadsAllowed,
+  };
+
+  static AddonAlternative? fromJson(Map<String, dynamic> json) {
+    final source = AddonSourceId.tryParse(json['source'] as String?);
+    final externalId = json['externalId'] as String?;
+    if (source == null || externalId == null) return null;
+    return AddonAlternative(
+      source: source,
+      externalId: externalId,
+      name: json['name'] as String? ?? externalId,
+      downloadsAllowed: json['downloadsAllowed'] as bool? ?? true,
+    );
+  }
+}
+
 /// An addon present in an installation's `Interface/AddOns` folder.
 class InstalledAddon {
   const InstalledAddon({
@@ -160,6 +204,9 @@ class InstalledAddon {
     this.pinned = false,
     this.external = false,
     this.downloadsAllowed = true,
+    this.manualSource = false,
+    this.alternatives = const [],
+    this.alternativesCheckedAt,
     this.latestRelease,
     this.interfaces = const [],
   });
@@ -200,6 +247,16 @@ class InstalledAddon {
   /// Mirrors [RemoteAddon.downloadsAllowed] of the assigned source.
   final bool downloadsAllowed;
 
+  /// The user picked [source] as the primary source; syncs and the
+  /// automatic fallback to other sources keep it.
+  final bool manualSource;
+
+  /// Other sources that publish this addon, in no particular order.
+  final List<AddonAlternative> alternatives;
+
+  /// When other sources were last searched for this addon by name.
+  final DateTime? alternativesCheckedAt;
+
   /// Most recent release for [channel], refreshed by update checks.
   final AddonRelease? latestRelease;
   final List<int> interfaces;
@@ -236,6 +293,7 @@ class InstalledAddon {
     String? websiteUrl,
     String? installedVersion,
     String? installedReleaseId,
+    bool clearInstalledReleaseId = false,
     DateTime? installedAt,
     ReleaseChannel? channel,
     bool? autoUpdate,
@@ -243,6 +301,9 @@ class InstalledAddon {
     bool? pinned,
     bool? external,
     bool? downloadsAllowed,
+    bool? manualSource,
+    List<AddonAlternative>? alternatives,
+    DateTime? alternativesCheckedAt,
     AddonRelease? latestRelease,
     bool clearLatestRelease = false,
     List<int>? interfaces,
@@ -257,7 +318,9 @@ class InstalledAddon {
     thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
     websiteUrl: websiteUrl ?? this.websiteUrl,
     installedVersion: installedVersion ?? this.installedVersion,
-    installedReleaseId: installedReleaseId ?? this.installedReleaseId,
+    installedReleaseId: clearInstalledReleaseId
+        ? null
+        : installedReleaseId ?? this.installedReleaseId,
     installedAt: installedAt ?? this.installedAt,
     channel: channel ?? this.channel,
     autoUpdate: autoUpdate ?? this.autoUpdate,
@@ -265,6 +328,9 @@ class InstalledAddon {
     pinned: pinned ?? this.pinned,
     external: external ?? this.external,
     downloadsAllowed: downloadsAllowed ?? this.downloadsAllowed,
+    manualSource: manualSource ?? this.manualSource,
+    alternatives: alternatives ?? this.alternatives,
+    alternativesCheckedAt: alternativesCheckedAt ?? this.alternativesCheckedAt,
     latestRelease: clearLatestRelease
         ? null
         : latestRelease ?? this.latestRelease,
@@ -290,6 +356,9 @@ class InstalledAddon {
     'pinned': pinned,
     'external': external,
     'downloadsAllowed': downloadsAllowed,
+    'manualSource': manualSource,
+    'alternatives': alternatives.map((a) => a.toJson()).toList(),
+    'alternativesCheckedAt': alternativesCheckedAt?.toIso8601String(),
     'latestRelease': latestRelease?.toJson(),
     'interfaces': interfaces,
   };
@@ -319,6 +388,14 @@ class InstalledAddon {
     pinned: json['pinned'] as bool? ?? false,
     external: json['external'] as bool? ?? false,
     downloadsAllowed: json['downloadsAllowed'] as bool? ?? true,
+    manualSource: json['manualSource'] as bool? ?? false,
+    alternatives: [
+      for (final a in (json['alternatives'] as List?) ?? const [])
+        ?AddonAlternative.fromJson(a as Map<String, dynamic>),
+    ],
+    alternativesCheckedAt: DateTime.tryParse(
+      json['alternativesCheckedAt'] as String? ?? '',
+    ),
     latestRelease: json['latestRelease'] == null
         ? null
         : AddonRelease.fromJson(json['latestRelease'] as Map<String, dynamic>),

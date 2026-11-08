@@ -15,6 +15,8 @@ Addon-Manager für World of Warcraft (Flutter, Linux/Windows/macOS) mit dem Funk
 - **Quellen:** CurseForge, Wago, WowUp Hub, TukUI (ElvUI/Tukui direkt), WoWInterface und GitHub-Releases, parallel durchsucht. Die Priorität beim Zuordnen ist einstellbar.
 - **Erkennung installierter Addons:** über die Folder-Fingerprints von WowUp (Murmur2 für CurseForge, MD5 für Wago/WowUp Hub), TOC-IDs (`X-Curse-Project-ID`, `X-Wago-ID`, `X-WoWI-ID`) und TukUI-Metadaten. Nicht zugeordnete Addons lassen sich nachträglich manuell einer Quelle zuordnen.
 - **Clients:** Retail, PTR/Beta, Classic (Mists), Classic Era, Anniversary und WoW Forever. Die Spielversion wird aus `.build.info` gelesen. Unter Linux werden Wine-, Lutris-, Bottles- und Steam-Proton-Prefixe automatisch gefunden.
+- **Quellenwahl:** Die Reihenfolge der Quellen in den Einstellungen bestimmt die primäre Quelle. Pro Addon zeigt die Detailansicht alle Quellen, die es führen; jede lässt sich dort als primär festlegen.
+- **Gesperrte Downloads:** Manche Autoren erlauben auf CurseForge keine Downloads über Drittanbieter-Programme. WoW Butler weicht dann automatisch auf die nächste Quelle aus, die das Addon führt (abschaltbar). Gibt es keine, öffnet „Über Website installieren“ die Downloadseite im Browser. Sobald die Datei im Download-Ordner liegt, installiert WoW Butler sie; alternativ lässt sich die ZIP-Datei auswählen. Danach meldet die App Updates wie gewohnt.
 - **Updates:** Kanäle Stable/Beta/Alpha pro Addon, Pinnen, Ignorieren, Auto-Update, Update-Warteschlange mit parallelen Downloads (Standard 5, einstellbar) und Abhängigkeiten (CurseForge).
 - **Backups:**
   - ZIP-Archive in einen frei wählbaren Ordner, periodisch mit Aufbewahrung. Ein neues Archiv entsteht nur, wenn sich die Daten geändert haben.
