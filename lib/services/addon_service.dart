@@ -570,13 +570,25 @@ class AddonService {
     }
     final source = sources()[remote.source];
     return _stage(inst, remote, release, onProgress, (zip) async {
-      final request = source.downloadRequest(release);
-      await api.download(
-        request.uri,
-        zip,
-        headers: request.headers,
-        onProgress: (v) => onProgress?.call(v * 0.8),
-      );
+      final requests = await source.downloadRequests(remote, release);
+      Object? lastError;
+      for (final request in requests) {
+        try {
+          await api.download(
+            request.uri,
+            zip,
+            headers: request.headers,
+            onProgress: (v) => onProgress?.call(v * 0.8),
+          );
+          return;
+        } catch (e) {
+          // Retry with the next request (e.g. another user agent); the last
+          // error is rethrown when every attempt failed.
+          lastError = e;
+        }
+      }
+      throw lastError ??
+          AddonException('${remote.name}: Download fehlgeschlagen.');
     });
   }
 

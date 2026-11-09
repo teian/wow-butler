@@ -85,4 +85,13 @@ abstract class AddonSource {
   ({Uri uri, Map<String, String> headers}) downloadRequest(
     AddonRelease release,
   ) => (uri: Uri.parse(release.downloadUrl), headers: const {});
+
+  /// The download requests to try in order for [release] of [addon], stopping
+  /// at the first that succeeds. Sources with short-lived URLs resolve them
+  /// here, and sources whose CDN is picky about clients can offer a second
+  /// attempt with a different user agent.
+  Future<List<({Uri uri, Map<String, String> headers})>> downloadRequests(
+    RemoteAddon addon,
+    AddonRelease release,
+  ) async => [downloadRequest(release)];
 }
