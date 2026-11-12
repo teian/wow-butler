@@ -86,6 +86,20 @@ class _WebsiteInstallDialogState extends ConsumerState<_WebsiteInstallDialog> {
 
   String get _fileName => widget.release.fileName ?? '';
 
+  String? get _pageUrl => ref
+      .read(sourcesProvider)[widget.remote.source]
+      .websiteDownloadUrl(widget.remote, widget.release);
+
+  @override
+  void initState() {
+    super.initState();
+    // Opening the dialog is the user's request to download: open the
+    // download page right away, the browser then starts the download.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) openUrl(_pageUrl);
+    });
+  }
+
   @override
   void dispose() {
     _watcher?.cancel();
@@ -162,9 +176,7 @@ class _WebsiteInstallDialogState extends ConsumerState<_WebsiteInstallDialog> {
     final w = context.w;
     final dir = ref.watch(downloadsDirectoryProvider).value;
     _watch(dir);
-    final pageUrl = ref
-        .read(sourcesProvider)[widget.remote.source]
-        .websiteDownloadUrl(widget.remote, widget.release);
+    final pageUrl = _pageUrl;
     final installing = _phase == _Phase.installing;
 
     Widget step(int n, String title, Widget body) => Padding(
@@ -233,9 +245,10 @@ class _WebsiteInstallDialogState extends ConsumerState<_WebsiteInstallDialog> {
             const SizedBox(height: 6),
             Text(
               'Der Autor erlaubt keine direkten Downloads über '
-              'Drittanbieter-Programme. Lade die Datei im Browser herunter; '
-              'WoW Butler installiert sie dann und hält das Addon wie gewohnt '
-              'aktuell.',
+              'Drittanbieter-Programme. Die Downloadseite wurde im Browser '
+              'geöffnet; der Download startet dort nach wenigen Sekunden. '
+              'WoW Butler installiert die Datei dann und hält das Addon wie '
+              'gewohnt aktuell.',
               style: TextStyle(fontSize: 12, color: w.muted),
             ),
             step(
@@ -244,9 +257,8 @@ class _WebsiteInstallDialogState extends ConsumerState<_WebsiteInstallDialog> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: WButton(
-                  label: 'Downloadseite öffnen',
+                  label: 'Downloadseite erneut öffnen',
                   icon: Icons.open_in_new_rounded,
-                  kind: WButtonKind.primary,
                   small: true,
                   onPressed: pageUrl == null || installing
                       ? null

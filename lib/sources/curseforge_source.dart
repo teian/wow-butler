@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:collection/collection.dart';
 
 import '../core/external_addons.dart';
@@ -44,7 +46,62 @@ class CurseForgeSource extends AddonSource {
     return null;
   }
 
-  Map<String, String> get _headers => {'x-api-key': _apiKey ?? ''};
+  /// A regular, current Chrome desktop user agent. Used first for CurseForge
+  /// requests, which its CDN serves like any browser's.
+  static const browserUserAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36';
+
+  /// The WowUp CurseForge client's user agent, used when [browserUserAgent] is
+  /// rejected. Matches WowUp-CF's `getUserAgent` in
+  /// `wowup-electron/app/main.ts`.
+  static final String wowupCfUserAgent = _buildUserAgent();
+
+  /// WowUp-CF release this fallback user agent mimics.
+  static const wowupCfVersion = '2.25.4';
+
+  static String _buildUserAgent() {
+    final osType = switch (Platform.operatingSystem) {
+      'windows' => 'Windows_NT',
+      'macos' => 'Darwin',
+      _ => 'Linux',
+    };
+    // WowUp-CF always ends with `CF; <portable> +https://wowup.io`; without the
+    // portable flag that leaves two spaces after `CF;`.
+    return 'WowUp-Client/$wowupCfVersion '
+        '($osType; ${_osRelease()}; ${_osArch()}; CF;  +https://wowup.io)';
+  }
+
+  /// Node's `os.release()`: the kernel release on Linux and Windows, the
+  /// product version on macOS (Dart does not expose the Darwin kernel).
+  static String _osRelease() {
+    final version = Platform.operatingSystemVersion;
+    if (Platform.isLinux) {
+      // "Linux 6.5.0-27-generic #1 SMP …" -> "6.5.0-27-generic".
+      final parts = version.split(' ');
+      if (parts.length > 1) return parts[1];
+    } else if (Platform.isWindows) {
+      // "Windows 11 Pro 10.0.22631" -> "10.0.22631".
+      final match = RegExp(r'\d+\.\d+(?:\.\d+)*').firstMatch(version);
+      if (match != null) return match.group(0)!;
+    } else if (Platform.isMacOS) {
+      // "Mac OS X 14.5.0 23F79 …" -> "14.5.0".
+      final parts = version.split(' ');
+      if (parts.length > 3) return parts[3];
+    }
+    return version;
+  }
+
+  /// Node's `os.arch()`: `Platform.version` ends with `on "<os>_<arch>"`.
+  static String _osArch() {
+    final match = RegExp('on "([a-z0-9_]+)"').firstMatch(Platform.version);
+    return match?.group(1)?.split('_').last ?? 'x64';
+  }
+
+  Map<String, String> get _headers => {
+    'x-api-key': _apiKey ?? '',
+    HttpHeaders.userAgentHeader: browserUserAgent,
+  };
 
   static int gameVersionTypeId(GameFlavor flavor) => switch (flavor) {
     GameFlavor.retail => 517,
@@ -414,16 +471,53 @@ class CurseForgeSource extends AddonSource {
     return html == null ? null : htmlToText(html);
   }
 
+  /// CurseForge serves files to a normal browser, so the download is tried
+  /// first with [browserUserAgent]. If the CDN rejects it, a second attempt
+  /// identifies as WowUp-CF. The URL is refreshed right before downloading, as
+  /// WowUp-CF does.
   @override
-  ({Uri uri, Map<String, String> headers}) downloadRequest(
+  Future<List<({Uri uri, Map<String, String> headers})>> downloadRequests(
+    RemoteAddon addon,
     AddonRelease release,
-  ) {
-    final uri = Uri.parse(release.downloadUrl);
-    return (
-      uri: uri,
-      headers: uri.host == 'api.curseforge.com' ? _headers : const {},
-    );
+  ) async {
+    final uri = await _resolveDownloadUrl(addon, release);
+    return [
+      (uri: uri, headers: _downloadHeaders(browserUserAgent)),
+      (uri: uri, headers: _downloadHeaders(wowupCfUserAgent)),
+    ];
   }
+
+  /// The freshest download URL for [release], falling back to the one stored
+  /// with the release when the endpoint is unavailable.
+  Future<Uri> _resolveDownloadUrl(
+    RemoteAddon addon,
+    AddonRelease release,
+  ) async {
+    if (_apiKey?.isNotEmpty ?? false) {
+      try {
+        final json =
+            await _api.getJson(
+                  Uri.parse(
+                    '$_base/v1/mods/${addon.externalId}/files/'
+                    '${release.id}/download-url',
+                  ),
+                  headers: _headers,
+                )
+                as Map<String, dynamic>;
+        final url = json.str('data');
+        if (url != null && url.isNotEmpty) return Uri.parse(url);
+      } on Object {
+        // Fall back to the URL stored with the release.
+      }
+    }
+    return Uri.parse(release.downloadUrl);
+  }
+
+  Map<String, String> _downloadHeaders(String userAgent) => {
+    HttpHeaders.userAgentHeader: userAgent,
+    HttpHeaders.acceptHeader: '*/*',
+    'x-api-key': _apiKey ?? '',
+  };
 
   bool _isCompatible(Map<String, dynamic> file, int typeId) => file
       .objs('sortableGameVersions')
