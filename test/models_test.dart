@@ -79,5 +79,14 @@ void main() {
     expect(s.sourcePriority.toSet(), AddonSourceId.values.toSet());
     expect(s.defaultChannel, ReleaseChannel.beta);
     expect(s.autoUpdate, isTrue);
+    expect(s.minimizeToTray, isTrue);
+  });
+
+  test('settings keep minimizeToTray across a JSON round trip', () {
+    final off = AppSettings.fromJson(
+      const AppSettings(minimizeToTray: false).toJson(),
+    );
+    expect(off.minimizeToTray, isFalse);
+    expect(AppSettings.fromJson(const {}).minimizeToTray, isTrue);
   });
 }

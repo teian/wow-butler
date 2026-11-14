@@ -81,6 +81,13 @@ set(CMAKE_DISABLE_FIND_PACKAGE_JNI ON)
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# tray_manager calls app_indicator_new(), which libayatana-appindicator 0.6
+# marks deprecated; with the standard -Werror that fails the build.
+if(TARGET tray_manager_plugin)
+  target_compile_options(tray_manager_plugin PRIVATE
+    -Wno-error=deprecated-declarations)
+endif()
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build

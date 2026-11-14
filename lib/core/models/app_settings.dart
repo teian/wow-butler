@@ -164,6 +164,7 @@ class AppSettings {
     this.checkOnStart = true,
     this.defaultChannel = ReleaseChannel.stable,
     this.backupBeforeUpdate = true,
+    this.minimizeToTray = true,
     this.zipBackup = const ZipBackupSettings(),
     this.gitBackup = const GitBackupSettings(),
   });
@@ -215,6 +216,11 @@ class AppSettings {
   /// Zip the WTF folder before an update run, so addon settings can be
   /// restored if a new version breaks them.
   final bool backupBeforeUpdate;
+
+  /// Closing the window hides it to the system tray instead of quitting, so
+  /// scheduled update checks and backups keep running. Only takes effect
+  /// where a tray is available.
+  final bool minimizeToTray;
   final ZipBackupSettings zipBackup;
   final GitBackupSettings gitBackup;
 
@@ -241,6 +247,7 @@ class AppSettings {
     bool? checkOnStart,
     ReleaseChannel? defaultChannel,
     bool? backupBeforeUpdate,
+    bool? minimizeToTray,
     ZipBackupSettings? zipBackup,
     GitBackupSettings? gitBackup,
   }) => AppSettings(
@@ -262,6 +269,7 @@ class AppSettings {
     checkOnStart: checkOnStart ?? this.checkOnStart,
     defaultChannel: defaultChannel ?? this.defaultChannel,
     backupBeforeUpdate: backupBeforeUpdate ?? this.backupBeforeUpdate,
+    minimizeToTray: minimizeToTray ?? this.minimizeToTray,
     zipBackup: zipBackup ?? this.zipBackup,
     gitBackup: gitBackup ?? this.gitBackup,
   );
@@ -283,6 +291,7 @@ class AppSettings {
     'checkOnStart': checkOnStart,
     'defaultChannel': defaultChannel.name,
     'backupBeforeUpdate': backupBeforeUpdate,
+    'minimizeToTray': minimizeToTray,
     'zipBackup': zipBackup.toJson(),
     'gitBackup': gitBackup.toJson(),
   };
@@ -329,6 +338,7 @@ class AppSettings {
           ReleaseChannel.tryParse(json['defaultChannel'] as String?) ??
           ReleaseChannel.stable,
       backupBeforeUpdate: json['backupBeforeUpdate'] as bool? ?? true,
+      minimizeToTray: json['minimizeToTray'] as bool? ?? true,
       zipBackup: ZipBackupSettings.fromJson(
         (json['zipBackup'] as Map<String, dynamic>?) ?? const {},
       ),

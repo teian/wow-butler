@@ -13,6 +13,7 @@ import '../../state/backup_controller.dart';
 import '../../state/nav_controller.dart';
 import '../../state/providers.dart';
 import '../../state/settings_controller.dart';
+import '../../state/tray_controller.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../tokens.dart';
@@ -773,6 +774,8 @@ class _SystemCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(settingsProvider.select((s) => s.themeMode));
+    final toTray = ref.watch(settingsProvider.select((s) => s.minimizeToTray));
+    final trayAvailable = ref.watch(trayAvailableProvider).value ?? true;
     final dataDir = ref.watch(storageProvider).rootPath;
     return SectionCard(
       title: 'System',
@@ -788,6 +791,20 @@ class _SystemCard extends ConsumerWidget {
             value: mode,
             onChanged: (m) =>
                 _ctrl(ref).update((x) => x.copyWith(themeMode: m)),
+          ),
+        ),
+        SettingRow(
+          label: 'In die Symbolleiste minimieren',
+          hint: trayAvailable
+              ? 'Schließen blendet das Fenster aus; Updates und Backups '
+                    'laufen weiter. Beenden über das Menü des Symbols.'
+              : 'Keine Symbolleiste gefunden. GNOME braucht dafür die '
+                    'Erweiterung „AppIndicator and KStatusNotifierItem Support“.',
+          trailing: WToggle(
+            value: toTray && trayAvailable,
+            onChanged: trayAvailable
+                ? (v) => _ctrl(ref).update((x) => x.copyWith(minimizeToTray: v))
+                : null,
           ),
         ),
         SettingRow(

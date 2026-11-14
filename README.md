@@ -18,6 +18,7 @@ Addon-Manager für World of Warcraft (Flutter, Linux/Windows/macOS) mit dem Funk
 - **Quellenwahl:** Die Reihenfolge der Quellen in den Einstellungen bestimmt die primäre Quelle. Pro Addon zeigt die Detailansicht alle Quellen, die es führen; jede lässt sich dort als primär festlegen.
 - **Gesperrte Downloads:** Manche Autoren erlauben auf CurseForge keine Downloads über Drittanbieter-Programme. WoW Butler weicht dann automatisch auf die nächste Quelle aus, die das Addon führt (abschaltbar). Gibt es keine, öffnet „Über Website installieren“ die Downloadseite im Browser. Sobald die Datei im Download-Ordner liegt, installiert WoW Butler sie; alternativ lässt sich die ZIP-Datei auswählen. Danach meldet die App Updates wie gewohnt.
 - **Updates:** Kanäle Stable/Beta/Alpha pro Addon, Pinnen, Ignorieren, Auto-Update, Update-Warteschlange mit parallelen Downloads (Standard 5, einstellbar) und Abhängigkeiten (CurseForge).
+- **Symbolleiste:** Schließen blendet das Fenster aus, WoW Butler prüft im Hintergrund weiter auf Updates und erstellt Backups. Das Symbol in der Symbolleiste öffnet das Fenster, stößt eine Prüfung an oder beendet die App (abschaltbar). Unter Linux braucht es einen StatusNotifier-Host, also KDE oder GNOME mit der Erweiterung „AppIndicator and KStatusNotifierItem Support“.
 - **Backups:**
   - ZIP-Archive in einen frei wählbaren Ordner, periodisch mit Aufbewahrung. Ein neues Archiv entsteht nur, wenn sich die Daten geändert haben.
   - Vor Updates wird der WTF-Ordner gesichert.
@@ -73,7 +74,8 @@ Flutter aus `mise.toml` und die native Toolchain (`flutter doctor`). Portable Ar
 und Prüfsummen entstehen in Dart mit den Projektabhängigkeiten; für die Installer
 kommen pro Plattform Paketierungswerkzeuge hinzu.
 
-- **Linux:** Clang, CMake, Ninja, pkg-config und GTK-3-Entwicklungsbibliotheken;
+- **Linux:** Clang, CMake, Ninja, pkg-config, GTK-3- und Ayatana-AppIndicator-Entwicklungsbibliotheken
+  (`libgtk-3-dev libayatana-appindicator3-dev` bzw. `gtk3-devel libayatana-appindicator-gtk3-devel`);
   für die Pakete [nfpm](https://nfpm.goreleaser.com), das `mise install` mitinstalliert.
 - **Windows:** Visual Studio 2022 mit „Desktop development with C++“ und Windows SDK;
   für die Installer [Inno Setup 6](https://jrsoftware.org/isinfo.php) und das
@@ -102,7 +104,7 @@ Pakete, Installer und ihre SHA-256-Prüfsummen liegen in `dist/`:
 | Debian/Ubuntu | `wow-butler_<version>_<arch>.deb` | `sudo apt install ./<datei>.deb` |
 | Fedora | `wow-butler-<version>-1.<arch>.rpm` | `sudo dnf install ./<datei>.rpm` |
 | Arch Linux | `wow-butler-<version>-1-<arch>.pkg.tar.zst` | `sudo pacman -U <datei>.pkg.tar.zst` |
-| Linux (portabel) | `wow-butler-<version>-linux-<arch>.tar.gz` | entpacken, `wow-butler/wow_butler` starten |
+| Linux (portabel) | `wow-butler-<version>-linux-<arch>.tar.gz` | entpacken, `wow-butler/wow_butler` starten; braucht GTK 3 und `libayatana-appindicator3` |
 | Windows | `wow-butler-<version>-windows-<arch>-setup.exe` | Setup; pro Benutzer oder für alle Benutzer |
 | Windows | `wow-butler-<version>-windows-<arch>.msi` | MSI für alle Benutzer, z. B. für Softwareverteilung |
 | Windows (portabel) | `wow-butler-<version>-windows-<arch>.zip` | entpacken, `wow-butler/wow_butler.exe` starten |

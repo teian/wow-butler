@@ -7,6 +7,7 @@ import '../state/addons_controller.dart';
 import '../state/nav_controller.dart';
 import '../state/scheduler.dart';
 import '../state/settings_controller.dart';
+import '../state/tray_controller.dart';
 import 'chrome/sidebar.dart';
 import 'chrome/status_bar.dart';
 import 'chrome/title_bar.dart';
@@ -26,6 +27,7 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(schedulerProvider);
+    ref.watch(trayProvider);
     ref.listen(activityProvider, (previous, next) {
       if (next.isEmpty || identical(previous?.firstOrNull, next.first)) return;
       final entry = next.first;
