@@ -13,6 +13,7 @@ import '../../state/backup_controller.dart';
 import '../../state/nav_controller.dart';
 import '../../state/providers.dart';
 import '../../state/settings_controller.dart';
+import '../../state/tray_controller.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../tokens.dart';
@@ -509,11 +510,21 @@ class _KeyFieldState extends State<_KeyField> {
   late final _controller = TextEditingController(text: widget.value ?? '');
   final _focus = FocusNode();
 
+  /// Shows the key in plain text, e.g. to check what was pasted.
+  bool _revealed = false;
+
+  bool get _hasText => _controller.text.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
     _focus.addListener(() {
       if (!_focus.hasFocus) _save();
+    });
+    // The reveal toggle appears and disappears with the text.
+    var hadText = _hasText;
+    _controller.addListener(() {
+      if (_hasText != hadText) setState(() => hadText = _hasText);
     });
   }
 
@@ -537,8 +548,17 @@ class _KeyFieldState extends State<_KeyField> {
     focusNode: _focus,
     hint: widget.hint,
     mono: true,
-    obscure: widget.obscure && _controller.text.isNotEmpty,
+    obscure: widget.obscure && _hasText && !_revealed,
     onSubmitted: (_) => _save(),
+    suffix: widget.obscure && _hasText
+        ? WIconButton(
+            icon: _revealed
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            tooltip: _revealed ? 'Schlüssel verbergen' : 'Schlüssel anzeigen',
+            onPressed: () => setState(() => _revealed = !_revealed),
+          )
+        : null,
   );
 }
 
@@ -773,6 +793,8 @@ class _SystemCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(settingsProvider.select((s) => s.themeMode));
+    final toTray = ref.watch(settingsProvider.select((s) => s.minimizeToTray));
+    final trayAvailable = ref.watch(trayAvailableProvider).value ?? true;
     final dataDir = ref.watch(storageProvider).rootPath;
     return SectionCard(
       title: 'System',
@@ -788,6 +810,20 @@ class _SystemCard extends ConsumerWidget {
             value: mode,
             onChanged: (m) =>
                 _ctrl(ref).update((x) => x.copyWith(themeMode: m)),
+          ),
+        ),
+        SettingRow(
+          label: 'In die Symbolleiste minimieren',
+          hint: trayAvailable
+              ? 'Schließen blendet das Fenster aus; Updates und Backups '
+                    'laufen weiter. Beenden über das Menü des Symbols.'
+              : 'Keine Symbolleiste gefunden. GNOME braucht dafür die '
+                    'Erweiterung „AppIndicator and KStatusNotifierItem Support“.',
+          trailing: WToggle(
+            value: toTray && trayAvailable,
+            onChanged: trayAvailable
+                ? (v) => _ctrl(ref).update((x) => x.copyWith(minimizeToTray: v))
+                : null,
           ),
         ),
         SettingRow(

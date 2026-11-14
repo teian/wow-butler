@@ -263,15 +263,15 @@ Future<List<String>> _linuxPackages(
     ],
     'overrides': {
       'deb': {
-        'depends': ['libgtk-3-0t64 | libgtk-3-0'],
+        'depends': ['libgtk-3-0t64 | libgtk-3-0', 'libayatana-appindicator3-1'],
         'recommends': ['git', 'xdg-desktop-portal'],
       },
       'rpm': {
-        'depends': ['gtk3'],
+        'depends': ['gtk3', 'libayatana-appindicator-gtk3'],
         'recommends': ['git', 'xdg-desktop-portal'],
       },
       'archlinux': {
-        'depends': ['gtk3'],
+        'depends': ['gtk3', 'libayatana-appindicator'],
         'recommends': ['git: Git-Backups', 'xdg-desktop-portal: Ordnerauswahl'],
       },
     },

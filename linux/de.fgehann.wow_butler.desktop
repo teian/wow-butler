@@ -5,5 +5,5 @@ Comment=Addon-Manager für World of Warcraft
 Exec=wow_butler %U
 Icon=wow-butler
 Terminal=false
-Categories=Game;Utility;
+Categories=Game;
 StartupWMClass=de.fgehann.wow_butler

@@ -681,6 +681,8 @@ class WInput extends StatelessWidget {
             : null,
         prefixIconConstraints: const BoxConstraints(minWidth: 34),
         suffixIcon: suffix,
+        // Keeps a small suffix button from growing the field.
+        suffixIconConstraints: const BoxConstraints(minWidth: 34),
         border: border,
         enabledBorder: border,
         focusedBorder: border.copyWith(
