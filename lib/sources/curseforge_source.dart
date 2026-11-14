@@ -448,12 +448,13 @@ class CurseForgeSource extends AddonSource {
       downloadCount: m.integer('downloadCount'),
       updatedAt: m.date('dateReleased') ?? m.date('dateModified'),
       releases: releases,
-      // Older API responses lack the flag; files without a download URL
-      // tell the same.
-      downloadsAllowed:
-          m['allowModDistribution'] != false &&
-          !(releases.isNotEmpty &&
-              releases.every((r) => r.downloadUrl.isEmpty)),
+      // `allowModDistribution` is a property of the mod and comes back the
+      // same for every key, while the download URLs depend on the key: keys
+      // with distribution rights get them even for opted-out mods. So the
+      // URLs decide, and the flag only when there is no file to look at.
+      downloadsAllowed: releases.isEmpty
+          ? m['allowModDistribution'] != false
+          : releases.any((r) => r.downloadUrl.isNotEmpty),
     );
   }
 

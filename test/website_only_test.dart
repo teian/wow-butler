@@ -17,7 +17,12 @@ import 'package:wow_butler/sources/source_registry.dart';
 const _cfKey = r'$2a$10$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUV0123456789';
 
 /// QuestieDB as CurseForge returns it, with third-party downloads disabled.
-Map<String, dynamic> _questieDbMod({bool allowed = false}) => {
+/// [privilegedKey] mimics a key with distribution rights: the mod still
+/// says it disallows distribution, but the files carry download URLs.
+Map<String, dynamic> _questieDbMod({
+  bool allowed = false,
+  bool privilegedKey = false,
+}) => {
   'id': 42,
   'slug': 'questiedb',
   'name': 'QuestieDB',
@@ -31,7 +36,9 @@ Map<String, dynamic> _questieDbMod({bool allowed = false}) => {
       'id': 420,
       'displayName': '1.0.11 (Forever)',
       'fileName': 'QuestieDB-1.0.11-Forever.zip',
-      'downloadUrl': allowed ? 'https://example.invalid/q.zip' : null,
+      'downloadUrl': allowed || privilegedKey
+          ? 'https://example.invalid/q.zip'
+          : null,
       'releaseType': 1,
       'sortableGameVersions': [
         {
@@ -80,6 +87,7 @@ void main() {
   Future<InstalledAddon> sync({
     required bool github,
     bool cfAllowed = false,
+    bool privilegedKey = false,
     String githubAsset = 'QuestieDB-1.0.11-Forever.zip',
     List<InstalledAddon> stored = const [],
   }) async {
@@ -96,7 +104,10 @@ void main() {
             body = {
               'data': [
                 if (request.url.queryParameters['slug'] == 'questiedb')
-                  _questieDbMod(allowed: cfAllowed),
+                  _questieDbMod(
+                    allowed: cfAllowed,
+                    privilegedKey: privilegedKey,
+                  ),
               ],
             };
           }
@@ -177,6 +188,13 @@ void main() {
     final addon = await sync(github: true, cfAllowed: true);
     expect(addon.source, AddonSourceId.curseforge);
     expect(addon.downloadsAllowed, isTrue);
+  });
+
+  test('a key with distribution rights downloads opted-out mods', () async {
+    final addon = await sync(github: false, privilegedKey: true);
+    expect(addon.source, AddonSourceId.curseforge);
+    expect(addon.downloadsAllowed, isTrue);
+    expect(addon.updateNeedsWebsite, isFalse);
   });
 
   test('a stored website-only entry moves to a new source', () async {
