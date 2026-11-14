@@ -510,11 +510,21 @@ class _KeyFieldState extends State<_KeyField> {
   late final _controller = TextEditingController(text: widget.value ?? '');
   final _focus = FocusNode();
 
+  /// Shows the key in plain text, e.g. to check what was pasted.
+  bool _revealed = false;
+
+  bool get _hasText => _controller.text.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
     _focus.addListener(() {
       if (!_focus.hasFocus) _save();
+    });
+    // The reveal toggle appears and disappears with the text.
+    var hadText = _hasText;
+    _controller.addListener(() {
+      if (_hasText != hadText) setState(() => hadText = _hasText);
     });
   }
 
@@ -538,8 +548,17 @@ class _KeyFieldState extends State<_KeyField> {
     focusNode: _focus,
     hint: widget.hint,
     mono: true,
-    obscure: widget.obscure && _controller.text.isNotEmpty,
+    obscure: widget.obscure && _hasText && !_revealed,
     onSubmitted: (_) => _save(),
+    suffix: widget.obscure && _hasText
+        ? WIconButton(
+            icon: _revealed
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            tooltip: _revealed ? 'Schlüssel verbergen' : 'Schlüssel anzeigen',
+            onPressed: () => setState(() => _revealed = !_revealed),
+          )
+        : null,
   );
 }
 
