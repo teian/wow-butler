@@ -29,8 +29,17 @@ class WowInstallation {
   String get interfacePath => p.join(clientPath, 'Interface');
   String get wtfPath => p.join(clientPath, 'WTF');
 
-  /// Filesystem-safe name used for backup folders.
-  String get slug => '${clientType.name}-${id.substring(0, 8)}';
+  /// Folder name of this client's backups: just the game variant, so the
+  /// backups are found again from another machine or install path.
+  String get slug => clientType.name;
+
+  /// Folder name used before backups were stored per variant only.
+  String get legacySlug => '${clientType.name}-${id.substring(0, 8)}';
+
+  /// Whether [name] is a backup folder of this variant in the old
+  /// `<variant>-<id>` scheme, of this or any other install path.
+  bool isLegacySlug(String name) =>
+      RegExp('^${RegExp.escape(clientType.name)}-[0-9a-f]{8}\$').hasMatch(name);
 
   WowInstallation copyWith({
     String? label,

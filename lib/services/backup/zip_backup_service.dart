@@ -36,15 +36,41 @@ class BackupScope {
 }
 
 /// Zip snapshots of `Interface/AddOns` and `WTF`, stored per installation in
-/// a user chosen directory: `<dir>/<installation-slug>/<timestamp>.zip`.
+/// a user chosen directory: `<dir>/<game variant>/<timestamp>.zip`.
 class ZipBackupService {
   const ZipBackupService();
 
   static const manifestName = 'wow-butler-addons.json';
   static final _stamp = DateFormat('yyyy-MM-dd_HH-mm-ss');
 
-  String _dirFor(String backupRoot, WowInstallation inst) =>
-      p.join(backupRoot, inst.slug);
+  /// Backup folder of [inst]. Archives from folders of the old
+  /// `<variant>-<id>` scheme are moved into it first.
+  Future<String> _dirFor(String backupRoot, WowInstallation inst) async {
+    final dir = p.join(backupRoot, inst.slug);
+    final root = Directory(backupRoot);
+    if (!await root.exists()) return dir;
+    final legacy = [
+      await for (final e in root.list())
+        if (e is Directory && inst.isLegacySlug(p.basename(e.path))) e,
+    ];
+    for (final old in legacy) {
+      try {
+        await Directory(dir).create(recursive: true);
+        await for (final e in old.list()) {
+          final target = p.join(dir, p.basename(e.path));
+          if (await FileSystemEntity.type(target) !=
+              FileSystemEntityType.notFound) {
+            continue;
+          }
+          await e.rename(target);
+        }
+        if (await old.list().isEmpty) await old.delete();
+      } on FileSystemException {
+        // Read-only or synced elsewhere: the old folder simply stays.
+      }
+    }
+    return dir;
+  }
 
   /// Creates a backup unless the data in [scope] is unchanged since the
   /// newest backup with the same scope. In that case the existing backup is
@@ -99,7 +125,7 @@ class ZipBackupService {
     String? fingerprint,
   }) async {
     fingerprint ??= await _fingerprintInIsolate(inst.clientPath, scope);
-    final dir = _dirFor(backupRoot, inst);
+    final dir = await _dirFor(backupRoot, inst);
     await Directory(dir).create(recursive: true);
     final name =
         '${_stamp.format(DateTime.now())}${suffix == null ? '' : '_$suffix'}.zip';
@@ -122,7 +148,7 @@ class ZipBackupService {
   }
 
   Future<List<ZipBackup>> list(String backupRoot, WowInstallation inst) async {
-    final dir = Directory(_dirFor(backupRoot, inst));
+    final dir = Directory(await _dirFor(backupRoot, inst));
     if (!await dir.exists()) return const [];
     final backups = <ZipBackup>[];
     await for (final e in dir.list()) {

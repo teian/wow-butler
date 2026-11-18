@@ -45,8 +45,9 @@ class GitBackupOutcome {
 }
 
 /// Versioned backups in a git repository. Each installation gets its own
-/// folder (`<slug>/Interface/AddOns`, `<slug>/WTF`, `<slug>/addons.json`), so
-/// one repository can hold all clients and be pushed to any remote.
+/// folder named after its game variant (`<slug>/Interface/AddOns`,
+/// `<slug>/WTF`, `<slug>/addons.json`), so one repository can hold all clients
+/// and be pushed to any remote. Older commits use `<variant>-<id>` folders.
 ///
 /// Uses the system `git` executable, which also brings the user's credential
 /// helpers and SSH setup for pushing.
@@ -100,6 +101,11 @@ class GitBackupService {
     await ensureRepo(settings);
     final repo = settings.repoPath!;
     final target = p.join(repo, inst.slug);
+    // Folder of the old `<variant>-<id>` scheme: continue it under the new
+    // name; the commit below records the move.
+    final legacy = Directory(p.join(repo, inst.legacySlug));
+    final moved = await legacy.exists() && !await Directory(target).exists();
+    if (moved) await legacy.rename(target);
     final clientPath = inst.clientPath;
     final includeAddons = settings.includeAddonFiles;
     final includeWtf = settings.includeWtf;
@@ -125,6 +131,7 @@ class GitBackupService {
       '-A',
       '--',
       inst.slug,
+      if (moved) inst.legacySlug,
       '.gitattributes',
       '.gitignore',
     ]);
@@ -172,6 +179,7 @@ class GitBackupService {
       '--format=%H%x1f%aI%x1f%s',
       '--',
       inst.slug,
+      inst.legacySlug,
     ]);
     return [
       for (final line in const LineSplitter().convert(out))
@@ -187,9 +195,10 @@ class GitBackupService {
     WowInstallation inst,
     String commit,
   ) async {
+    final slug = await _slugAt(s.repoPath!, inst, commit);
     final r = await _gitResult(s.repoPath!, [
       'show',
-      '$commit:${inst.slug}/addons.json',
+      '$commit:$slug/addons.json',
     ]);
     if (r.exitCode != 0) return null;
     return [
@@ -214,9 +223,10 @@ class GitBackupService {
       message: 'Stand vor Wiederherstellung von ${commit.substring(0, 8)}',
     );
     final repo = settings.repoPath!;
+    final slug = await _slugAt(repo, inst, commit);
     final r = await Process.run(
       'git',
-      ['archive', '--format=tar', commit, '--', inst.slug],
+      ['archive', '--format=tar', commit, '--', slug],
       workingDirectory: repo,
       stdoutEncoding: null,
     );
@@ -224,9 +234,23 @@ class GitBackupService {
       throw GitException('git archive: ${r.stderr}'.trim());
     }
     final tar = r.stdout as List<int>;
-    final slug = inst.slug;
     final clientPath = inst.clientPath;
     await _restoreTarInIsolate(tar, slug, clientPath, scope);
+  }
+
+  /// The folder of [inst] in [commit]: commits made before backups were
+  /// stored per variant only use the old name.
+  Future<String> _slugAt(
+    String repo,
+    WowInstallation inst,
+    String commit,
+  ) async {
+    final r = await _gitResult(repo, [
+      'cat-file',
+      '-e',
+      '$commit:${inst.slug}',
+    ]);
+    return r.exitCode == 0 ? inst.slug : inst.legacySlug;
   }
 
   Future<List<String>> _identityArgs(String repo) async {
