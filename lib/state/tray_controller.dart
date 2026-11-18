@@ -160,6 +160,8 @@ class TrayController {
   }
 
   Future<void> _hide() async {
+    // The tray may have been switched off while this was queued.
+    if (!_active) return;
     _window.hide();
     if (_hintShown) return;
     _hintShown = true;
