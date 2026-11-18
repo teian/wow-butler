@@ -33,7 +33,7 @@ jobs:
         if: matrix.target == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev liblzma-dev libstdc++-12-dev libx11-dev libxi-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libx11-dev libxi-dev
 
       - name: Install nfpm
         if: matrix.target == 'linux'

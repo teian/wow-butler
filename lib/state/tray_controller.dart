@@ -25,7 +25,7 @@ final trayProvider = Provider<TrayController>((ref) {
   return controller;
 });
 
-class TrayController with TrayListener {
+class TrayController {
   TrayController(this._ref) {
     // While the tray is active, a close request hides the window instead.
     _closeListener = _window.addListener((event) {
@@ -34,7 +34,6 @@ class TrayController with TrayListener {
         _enqueue(_hide);
       }
     });
-    trayManager.addListener(this);
     _ref.listen<bool>(
       settingsProvider.select((s) => s.minimizeToTray),
       (_, enabled) => _enqueue(() => _apply(enabled)),
@@ -42,20 +41,20 @@ class TrayController with TrayListener {
     );
   }
 
-  static const _keyShow = 'show';
-  static const _keyCheck = 'check';
-  static const _keyQuit = 'quit';
-
   final Ref _ref;
   final Window _window = WindowManager.instance.getCurrent()!;
   late final ListenerId _closeListener;
   bool _active = false;
+
+  // The icon is removed when its object is released, so keep it. The menu
+  // attached to it stays alive natively.
+  TrayIcon? _icon;
   bool _hintShown = false;
   Future<void> _queue = Future.value();
 
   void dispose() {
     _window.removeListener(_closeListener);
-    trayManager.removeListener(this);
+    _removeIcon();
   }
 
   static Future<bool> isSupported() async {
@@ -87,23 +86,65 @@ class TrayController with TrayListener {
     if (active == _active) return;
     _active = active;
     if (active) {
-      await trayManager.setIcon(_iconAsset);
-      if (!Platform.isLinux) await trayManager.setToolTip('WoW Butler');
-      await trayManager.setContextMenu(
-        Menu(
-          items: [
-            MenuItem(key: _keyShow, label: 'WoW Butler öffnen'),
-            MenuItem(key: _keyCheck, label: 'Updates prüfen'),
-            MenuItem.separator(),
-            MenuItem(key: _keyQuit, label: 'Beenden'),
-          ],
-        ),
-      );
+      try {
+        _createIcon();
+      } catch (_) {
+        // Without an icon there is no way back to a hidden window.
+        _active = false;
+        _removeIcon();
+        rethrow;
+      }
     } else {
-      await trayManager.destroy();
+      _removeIcon();
       // Never leave the app running without a window to get back to.
       if (!_window.isVisible) await _show();
     }
+  }
+
+  void _createIcon() {
+    final icon = TrayIcon.create();
+    final menu = Menu.create();
+    if (icon == null || menu == null) {
+      throw StateError('Symbol konnte nicht angelegt werden');
+    }
+    _icon = icon;
+    final items = [
+      _menuItem('WoW Butler öffnen', _show),
+      _menuItem('Updates prüfen', () async {
+        await _show();
+        await _checkUpdates();
+      }),
+      _menuItem('Beenden', _quit),
+    ];
+    menu
+      ..addItem(items[0])
+      ..addItem(items[1])
+      ..addSeparator()
+      ..addItem(items[2]);
+    icon
+      ..icon = ImageAsset.fromAsset(_iconAsset)
+      ..setTooltip('WoW Butler')
+      ..setContextMenu(menu)
+      // On Linux the panel opens the menu itself and reports no clicks.
+      ..setContextMenuTrigger(ContextMenuTrigger.rightClicked)
+      ..addListener((event) {
+        if (event is TrayIconClickedEvent) _enqueue(_show);
+      })
+      ..setVisible(true);
+  }
+
+  MenuItem _menuItem(String label, Future<void> Function() onClick) {
+    final item = MenuItem.createWithLabelAndType(label, MenuItemType.normal);
+    if (item == null) throw StateError('Menü konnte nicht angelegt werden');
+    item.addListener((event) {
+      if (event is MenuItemClickedEvent) _enqueue(onClick);
+    });
+    return item;
+  }
+
+  void _removeIcon() {
+    _icon?.dispose();
+    _icon = null;
   }
 
   static String get _iconAsset {
@@ -141,36 +182,8 @@ class TrayController with TrayListener {
 
   Future<void> _quit() async {
     _active = false;
-    await trayManager.destroy();
+    _removeIcon();
     // No longer active, so the close request goes through.
     _window.close();
-  }
-
-  // -- TrayListener ---------------------------------------------------------
-
-  @override
-  void onTrayIconMouseDown() {
-    // Windows and macOS only; AppIndicator opens its menu itself.
-    _enqueue(_show);
-  }
-
-  @override
-  void onTrayIconRightMouseDown() {
-    _enqueue(trayManager.popUpContextMenu);
-  }
-
-  @override
-  void onTrayMenuItemClick(MenuItem menuItem) {
-    switch (menuItem.key) {
-      case _keyShow:
-        _enqueue(_show);
-      case _keyCheck:
-        _enqueue(() async {
-          await _show();
-          await _checkUpdates();
-        });
-      case _keyQuit:
-        _enqueue(_quit);
-    }
   }
 }
