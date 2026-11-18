@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/addon.dart';
@@ -54,10 +54,7 @@ class _AssignSourceDialogState extends ConsumerState<_AssignSourceDialog> {
 
   void _onChanged(String query) {
     _debounce?.cancel();
-    _debounce = Timer(
-      const Duration(milliseconds: 350),
-      () => _search(query),
-    );
+    _debounce = Timer(const Duration(milliseconds: 350), () => _search(query));
   }
 
   Future<void> _search(String query) async {

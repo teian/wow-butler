@@ -16,10 +16,10 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.3.0
+version: 1.4.0
 
 environment:
-  sdk: ^3.13.4
+  sdk: ^3.14.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -47,12 +47,10 @@ dependencies:
   xml: ^7.0.1
   flutter_localizations:
     sdk: flutter
-  # Pinned below 0.6: its nativeapi core miscomputes the Linux input region
-  # with a hidden title bar, making buttons unclickable.
-  # https://github.com/leanflutter/window_manager/issues/595
-  window_manager: ^0.5.2
-  tray_manager: ^0.5.3
+  window_manager: ^0.7.0
+  tray_manager: ^0.9.0
   dbus: ^0.8.0
+  material_ui: ^1.11.1
 
 dev_dependencies:
   flutter_test:

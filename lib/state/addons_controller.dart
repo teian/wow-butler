@@ -187,6 +187,15 @@ class AddonsController extends Notifier<AddonsState> {
     }
   });
 
+  /// Called after a backup was restored into the installation: takes over
+  /// the addon list recorded in the backup ([manifest]), so every addon keeps
+  /// the source, channel and preferences it had, then rescans the folder.
+  Future<void> afterRestore(List<InstalledAddon>? manifest) async {
+    if (manifest != null) await _serial(() => _commit(manifest));
+    await rescan();
+    await checkUpdates();
+  }
+
   /// Refreshes the latest releases. With [autoUpdate], addons eligible for
   /// automatic updates are updated right away.
   Future<void> checkUpdates({bool autoUpdate = false}) async {

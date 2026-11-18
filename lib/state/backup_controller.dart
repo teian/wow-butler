@@ -198,18 +198,17 @@ class BackupController extends Notifier<BackupState> {
     BackupScope scope,
   ) async {
     final dir = ref.read(zipBackupRootProvider);
-    await _restoring(
-      inst,
-      () async => ref
-          .read(zipBackupServiceProvider)
-          .restore(
-            backup: backup,
-            backupRoot: dir,
-            inst: inst,
-            currentAddons: await _addonsOf(inst),
-            scope: scope,
-          ),
-    );
+    await _restoring(inst, () async {
+      final service = ref.read(zipBackupServiceProvider);
+      await service.restore(
+        backup: backup,
+        backupRoot: dir,
+        inst: inst,
+        currentAddons: await _addonsOf(inst),
+        scope: scope,
+      );
+      return scope.addons ? service.readManifest(backup) : null;
+    });
     ref.invalidate(zipBackupsProvider(inst.id));
   }
 
@@ -219,30 +218,31 @@ class BackupController extends Notifier<BackupState> {
     BackupScope scope,
   ) async {
     final cfg = ref.read(settingsProvider).gitBackup;
-    await _restoring(
-      inst,
-      () async => ref
-          .read(gitBackupServiceProvider)
-          .restore(
-            settings: cfg,
-            inst: inst,
-            currentAddons: await _addonsOf(inst),
-            commit: commit.hash,
-            scope: scope,
-          ),
-    );
+    await _restoring(inst, () async {
+      final service = ref.read(gitBackupServiceProvider);
+      await service.restore(
+        settings: cfg,
+        inst: inst,
+        currentAddons: await _addonsOf(inst),
+        commit: commit.hash,
+        scope: scope,
+      );
+      return scope.addons ? service.manifestAt(cfg, inst, commit.hash) : null;
+    });
     ref.invalidate(gitHistoryProvider(inst.id));
   }
 
+  /// Runs [restore], which returns the addon list recorded in the backup
+  /// when addon files were restored.
   Future<void> _restoring(
     WowInstallation inst,
-    Future<void> Function() restore,
+    Future<List<InstalledAddon>?> Function() restore,
   ) async {
     state = const BackupState(restoring: true);
     try {
-      await restore();
+      final manifest = await restore();
       _log.success('Wiederherstellung für ${inst.label} abgeschlossen');
-      await ref.read(addonsProvider(inst.id).notifier).rescan();
+      await ref.read(addonsProvider(inst.id).notifier).afterRestore(manifest);
     } catch (e) {
       _log.error('Wiederherstellung fehlgeschlagen: $e');
     } finally {

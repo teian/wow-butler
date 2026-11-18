@@ -37,7 +37,13 @@ enum AddonCategory {
     'encounter',
     'encounters',
   ]),
-  buffs('Buffs & Debuffs', 1005, ['buffs', 'debuffs', 'aura', 'auras', 'auren']),
+  buffs('Buffs & Debuffs', 1005, [
+    'buffs',
+    'debuffs',
+    'aura',
+    'auras',
+    'auren',
+  ]),
   chat('Chat', 1001, ['chat', 'communication', 'kommunikation']),
   classes('Klassen & Rotation', 1020, [
     'class',
@@ -71,12 +77,7 @@ enum AddonCategory {
     'crafting',
     'handwerk',
   ]),
-  pvp('PvP & Arena', 1004, [
-    'pvp',
-    'arena',
-    'battleground',
-    'schlachtfeld',
-  ]),
+  pvp('PvP & Arena', 1004, ['pvp', 'arena', 'battleground', 'schlachtfeld']),
   quests('Quests & Leveln', 1013, [
     'quest',
     'quests',
@@ -85,11 +86,7 @@ enum AddonCategory {
     'guide',
     'guides',
   ]),
-  raidFrames('Raid-Frames', 1037, [
-    'raid frames',
-    'raidframes',
-    'raid frame',
-  ]),
+  raidFrames('Raid-Frames', 1037, ['raid frames', 'raidframes', 'raid frame']),
   tooltip('Tooltips', 1055, ['tooltip', 'tooltips']),
   unitFrames('Einheitenfenster', 1016, [
     'unit frames',

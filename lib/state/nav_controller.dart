@@ -40,9 +40,7 @@ class NavController extends Notifier<NavState> {
   /// Development aid: `WOW_BUTLER_START_VIEW=browse` opens the app on a
   /// specific top-level page, e.g. for taking screenshots.
   static final AppView? _startView = AppView.values
-      .where(
-        (v) => v.name == Platform.environment['WOW_BUTLER_START_VIEW'],
-      )
+      .where((v) => v.name == Platform.environment['WOW_BUTLER_START_VIEW'])
       .firstOrNull;
 
   @override

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -6,6 +6,8 @@ import '../../core/models/app_settings.dart';
 import '../../state/settings_controller.dart';
 import '../tokens.dart';
 import '../widgets/primitives.dart';
+
+Window get _window => WindowManager.instance.getCurrent()!;
 
 /// Custom 40px title bar with drag area, theme toggle and window controls.
 class TitleBar extends ConsumerWidget {
@@ -95,21 +97,20 @@ class TitleBar extends ConsumerWidget {
           const SizedBox(width: 12),
           _WindowButton(
             icon: Icons.remove_rounded,
-            onTap: () => windowManager.minimize(),
+            onTap: () => _window.minimize(),
           ),
           const SizedBox(width: 8),
           _WindowButton(
             icon: Icons.crop_square_rounded,
             iconSize: 10,
-            onTap: () async => await windowManager.isMaximized()
-                ? windowManager.unmaximize()
-                : windowManager.maximize(),
+            onTap: () =>
+                _window.isMaximized ? _window.unmaximize() : _window.maximize(),
           ),
           const SizedBox(width: 8),
           _WindowButton(
             icon: Icons.close_rounded,
             hoverColor: WColors.red,
-            onTap: () => windowManager.close(),
+            onTap: () => _window.close(),
           ),
         ],
       ),

@@ -74,8 +74,8 @@ Flutter aus `mise.toml` und die native Toolchain (`flutter doctor`). Portable Ar
 und Prüfsummen entstehen in Dart mit den Projektabhängigkeiten; für die Installer
 kommen pro Plattform Paketierungswerkzeuge hinzu.
 
-- **Linux:** Clang, CMake, Ninja, pkg-config, GTK-3- und Ayatana-AppIndicator-Entwicklungsbibliotheken
-  (`libgtk-3-dev libayatana-appindicator3-dev` bzw. `gtk3-devel libayatana-appindicator-gtk3-devel`);
+- **Linux:** Clang, CMake, Ninja, pkg-config, GTK-3-, X11- und Xi-Entwicklungsbibliotheken
+  (`libgtk-3-dev libx11-dev libxi-dev` bzw. `gtk3-devel libX11-devel libXi-devel`);
   für die Pakete [nfpm](https://nfpm.goreleaser.com), das `mise install` mitinstalliert.
 - **Windows:** Visual Studio 2022 mit „Desktop development with C++“ und Windows SDK;
   für die Installer [Inno Setup 6](https://jrsoftware.org/isinfo.php) und das
@@ -104,7 +104,7 @@ Pakete, Installer und ihre SHA-256-Prüfsummen liegen in `dist/`:
 | Debian/Ubuntu | `wow-butler_<version>_<arch>.deb` | `sudo apt install ./<datei>.deb` |
 | Fedora | `wow-butler-<version>-1.<arch>.rpm` | `sudo dnf install ./<datei>.rpm` |
 | Arch Linux | `wow-butler-<version>-1-<arch>.pkg.tar.zst` | `sudo pacman -U <datei>.pkg.tar.zst` |
-| Linux (portabel) | `wow-butler-<version>-linux-<arch>.tar.gz` | entpacken, `wow-butler/wow_butler` starten; braucht GTK 3 und `libayatana-appindicator3` |
+| Linux (portabel) | `wow-butler-<version>-linux-<arch>.tar.gz` | entpacken, `wow-butler/wow_butler` starten; braucht GTK 3 |
 | Windows | `wow-butler-<version>-windows-<arch>-setup.exe` | Setup; pro Benutzer oder für alle Benutzer |
 | Windows | `wow-butler-<version>-windows-<arch>.msi` | MSI für alle Benutzer, z. B. für Softwareverteilung |
 | Windows (portabel) | `wow-butler-<version>-windows-<arch>.zip` | entpacken, `wow-butler/wow_butler.exe` starten |

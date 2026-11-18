@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_version.dart';
@@ -435,9 +435,9 @@ class _SourcesCard extends ConsumerWidget {
                 small: true,
                 label: 'Wählen',
                 onPressed: () async {
-                  final dir = await FilePicker.getDirectoryPath(
+                  final dir = (await FilePicker.pickDirectory(
                     dialogTitle: 'Download-Ordner des Browsers',
-                  );
+                  ))?.toFilePath();
                   if (dir != null) {
                     _ctrl(ref)
                         .update((x) => x.copyWith(downloadsDirectory: dir));
@@ -597,9 +597,8 @@ class _BackupCard extends ConsumerWidget {
               small: true,
               label: 'Wählen',
               onPressed: () async {
-                final dir = await FilePicker.getDirectoryPath(
-                  dialogTitle: title,
-                );
+                final dir = (await FilePicker.pickDirectory(dialogTitle: title))
+                    ?.toFilePath();
                 if (dir != null) onPicked(dir);
               },
             ),

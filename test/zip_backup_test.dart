@@ -32,6 +32,55 @@ void main() {
   });
   tearDown(() => tmp.deleteSync(recursive: true));
 
+  test('stores archives per game variant and adopts old folders', () async {
+    const service = ZipBackupService();
+    final root = p.join(tmp.path, 'backups');
+    // Folders of the old `<variant>-<id>` scheme, one from another machine.
+    for (final old in ['retail-abcdef01', 'retail-12345678']) {
+      File(
+          p.join(
+            root,
+            old,
+            '2026-01-0${old.endsWith('1') ? 1 : 2}_10-00-00.zip',
+          ),
+        )
+        ..createSync(recursive: true)
+        ..writeAsStringSync('x');
+    }
+    File(p.join(root, 'classic-abcdef01', '2026-01-03_10-00-00.zip'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('x');
+
+    final backup = await service.create(
+      backupRoot: root,
+      inst: inst,
+      addons: const [],
+      scope: const BackupScope(),
+    );
+    expect(p.dirname(backup.path), p.join(root, 'retail'));
+    expect((await service.list(root, inst)).length, 3);
+    expect(Directory(root).listSync().map((e) => p.basename(e.path)).toSet(), {
+      'retail',
+      'classic-abcdef01',
+    });
+  });
+
+  test('lists archives of old folders that cannot be merged', () async {
+    const service = ZipBackupService();
+    final root = p.join(tmp.path, 'backups');
+    // Same file name in both folders: the old one has to stay where it is.
+    for (final dir in ['retail', 'retail-12345678']) {
+      File(p.join(root, dir, '2026-01-01_10-00-00.zip'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('x');
+    }
+    final paths = [for (final b in await service.list(root, inst)) b.path];
+    expect(paths.map(p.dirname).map(p.basename).toSet(), {
+      'retail',
+      'retail-12345678',
+    });
+  });
+
   test('creates, lists, prunes and restores archives', () async {
     const service = ZipBackupService();
     final root = p.join(tmp.path, 'backups');

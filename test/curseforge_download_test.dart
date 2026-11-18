@@ -84,11 +84,8 @@ void main() {
         }),
       );
 
-      final prepared = await service(client).prepare(
-        inst,
-        remote: remote,
-        release: remote.releases.single,
-      );
+      final prepared = await service(client)
+          .prepare(inst, remote: remote, release: remote.releases.single);
       final result = await service(client).apply(inst, const [], prepared);
       client.close();
 
@@ -104,43 +101,42 @@ void main() {
       );
     });
 
-    test('retries with the WowUp user agent when the browser is rejected',
-        () async {
-      final archiveBytes = addonArchive();
-      final agents = <String?>[];
-      final client = ApiClient(
-        client: MockClient((request) async {
-          if (request.url.path.endsWith('/download-url')) {
-            return http.Response(
-              jsonEncode({'data': 'https://cdn.example/MyAddon-1.0.0.zip'}),
-              200,
-            );
-          }
-          if (request.url.host == 'cdn.example') {
-            final agent = request.headers[HttpHeaders.userAgentHeader];
-            agents.add(agent);
-            // The CDN rejects anything that is not the WowUp client.
-            return agent == CurseForgeSource.wowupCfUserAgent
-                ? http.Response.bytes(archiveBytes, 200)
-                : http.Response('forbidden', 403);
-          }
-          return http.Response('not found', 404);
-        }),
-      );
+    test(
+      'retries with the WowUp user agent when the browser is rejected',
+      () async {
+        final archiveBytes = addonArchive();
+        final agents = <String?>[];
+        final client = ApiClient(
+          client: MockClient((request) async {
+            if (request.url.path.endsWith('/download-url')) {
+              return http.Response(
+                jsonEncode({'data': 'https://cdn.example/MyAddon-1.0.0.zip'}),
+                200,
+              );
+            }
+            if (request.url.host == 'cdn.example') {
+              final agent = request.headers[HttpHeaders.userAgentHeader];
+              agents.add(agent);
+              // The CDN rejects anything that is not the WowUp client.
+              return agent == CurseForgeSource.wowupCfUserAgent
+                  ? http.Response.bytes(archiveBytes, 200)
+                  : http.Response('forbidden', 403);
+            }
+            return http.Response('not found', 404);
+          }),
+        );
 
-      final prepared = await service(client).prepare(
-        inst,
-        remote: remote,
-        release: remote.releases.single,
-      );
-      final result = await service(client).apply(inst, const [], prepared);
-      client.close();
+        final prepared = await service(client)
+            .prepare(inst, remote: remote, release: remote.releases.single);
+        final result = await service(client).apply(inst, const [], prepared);
+        client.close();
 
-      expect(result.single.folders, ['MyAddon']);
-      expect(agents, [
-        CurseForgeSource.browserUserAgent,
-        CurseForgeSource.wowupCfUserAgent,
-      ]);
-    });
+        expect(result.single.folders, ['MyAddon']);
+        expect(agents, [
+          CurseForgeSource.browserUserAgent,
+          CurseForgeSource.wowupCfUserAgent,
+        ]);
+      },
+    );
   });
 }

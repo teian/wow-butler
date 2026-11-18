@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Design tokens of the WowUp Linux design (slate palette, light and dark).
 @immutable
