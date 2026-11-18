@@ -1,5 +1,5 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/addon.dart';
@@ -31,9 +31,9 @@ Future<void> addInstallationFromPicker(WidgetRef ref) async {
 
 /// Lets the user choose a folder; `null` when cancelled or nothing found.
 Future<List<WowInstallation>?> pickInstallations(WidgetRef ref) async {
-  final dir = await FilePicker.getDirectoryPath(
+  final dir = (await FilePicker.pickDirectory(
     dialogTitle: 'World-of-Warcraft-Ordner wählen',
-  );
+  ))?.toFilePath();
   if (dir == null) return null;
   final found = await ref.read(installationDetectorProvider).fromUserPath(dir);
   if (found.isEmpty) {

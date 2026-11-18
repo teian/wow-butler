@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -348,9 +348,8 @@ class _LightboxState extends State<_Lightbox> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(
-                    0xFF0F172A,
-                  ).withValues(alpha: h ? 0.9 : 0.7),
+                  color: const Color(0xFF0F172A)
+                      .withValues(alpha: h ? 0.9 : 0.7),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -521,7 +520,11 @@ class DescriptionBody extends StatelessWidget {
                   Expanded(
                     child: Text(
                       f,
-                      style: TextStyle(fontSize: 13, height: 1.55, color: w.fg2),
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.55,
+                        color: w.fg2,
+                      ),
                     ),
                   ),
                 ],

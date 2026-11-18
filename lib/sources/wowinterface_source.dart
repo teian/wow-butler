@@ -72,18 +72,20 @@ class WowInterfaceSource extends AddonSource {
   @override
   Future<List<RemoteAddon>> search(String query, GameFlavor flavor) async {
     final q = query.toLowerCase();
-    final hits = (await _all())
-        .where((a) => isCompatible(a, flavor))
-        .where(
-          (a) =>
-              '${a['UIName']} ${a['UIAuthorName']}'.toLowerCase().contains(q),
-        )
-        .toList()
-      ..sort(
-        (a, b) => (int.tryParse('${b['UIDownloadTotal']}') ?? 0).compareTo(
-          int.tryParse('${a['UIDownloadTotal']}') ?? 0,
-        ),
-      );
+    final hits =
+        (await _all())
+            .where((a) => isCompatible(a, flavor))
+            .where(
+              (a) => '${a['UIName']} ${a['UIAuthorName']}'
+                  .toLowerCase()
+                  .contains(q),
+            )
+            .toList()
+          ..sort(
+            (a, b) => (int.tryParse('${b['UIDownloadTotal']}') ?? 0).compareTo(
+              int.tryParse('${a['UIDownloadTotal']}') ?? 0,
+            ),
+          );
     return [for (final a in hits.take(50)) _toRemote(a)];
   }
 
@@ -95,11 +97,9 @@ class WowInterfaceSource extends AddonSource {
   Future<List<RemoteAddon>> getMany(List<String> ids, GameFlavor flavor) async {
     if (ids.isEmpty) return const [];
     final listed = {for (final a in await _all()) '${a['UID']}': a};
-    final json =
-        await _api.getJson(
-              Uri.parse('$_base/filedetails/${ids.join(',')}.json'),
-            )
-            as List;
+    final json = await _api.getJson(
+      Uri.parse('$_base/filedetails/${ids.join(',')}.json'),
+    ) as List;
     return [
       for (final d in json.whereType<Map<String, dynamic>>())
         _toRemote(listed['${d['UID']}'] ?? d, details: d),
@@ -151,11 +151,9 @@ class WowInterfaceSource extends AddonSource {
     final a = (await _all())
         .where((e) => '${e['UID']}' == addon.externalId)
         .firstOrNull;
-    final json =
-        await _api.getJson(
-              Uri.parse('$_base/filedetails/${addon.externalId}.json'),
-            )
-            as List;
+    final json = await _api.getJson(
+      Uri.parse('$_base/filedetails/${addon.externalId}.json'),
+    ) as List;
     final d = json.whereType<Map<String, dynamic>>().firstOrNull;
     return detailsFromDescription(
       markdown: _stripBbcode(d?.str('UIDescription') ?? ''),
@@ -173,17 +171,19 @@ class WowInterfaceSource extends AddonSource {
 
   @override
   Future<String?> changelog(String externalId, AddonRelease release) async {
-    final json =
-        await _api.getJson(Uri.parse('$_base/filedetails/$externalId.json'))
-            as List;
-    final log = json
-        .whereType<Map<String, dynamic>>()
-        .firstOrNull
-        ?.str('UIChangeLog');
+    final json = await _api.getJson(
+      Uri.parse('$_base/filedetails/$externalId.json'),
+    ) as List;
+    final log = json.whereType<Map<String, dynamic>>().firstOrNull?.str(
+      'UIChangeLog',
+    );
     return log == null ? null : _stripBbcode(htmlToText(log));
   }
 
-  RemoteAddon _toRemote(Map<String, dynamic> a, {Map<String, dynamic>? details}) {
+  RemoteAddon _toRemote(
+    Map<String, dynamic> a, {
+    Map<String, dynamic>? details,
+  }) {
     return RemoteAddon(
       source: id,
       externalId: '${a['UID']}',
@@ -196,9 +196,7 @@ class WowInterfaceSource extends AddonSource {
         for (final t in (a['UIIMG_Thumbs'] as List?) ?? const []) '$t',
       ].firstOrNull,
       websiteUrl: a.str('UIFileInfoURL'),
-      downloadCount: int.tryParse(
-        '${a['UIDownloadTotal'] ?? a['UIHitCount']}',
-      ),
+      downloadCount: int.tryParse('${a['UIDownloadTotal'] ?? a['UIHitCount']}'),
       updatedAt: _date(a),
       releases: [?_release(a, details: details)],
     );
@@ -253,7 +251,11 @@ class WowInterfaceSource extends AddonSource {
   /// WoWInterface descriptions and changelogs are BBCode.
   static String _stripBbcode(String s) => s
       .replaceAllMapped(
-        RegExp(r'\[URL=[^\]]*\](.*?)\[/URL\]', caseSensitive: false, dotAll: true),
+        RegExp(
+          r'\[URL=[^\]]*\](.*?)\[/URL\]',
+          caseSensitive: false,
+          dotAll: true,
+        ),
         (m) => m.group(1)!,
       )
       .replaceAll(

@@ -29,10 +29,7 @@ void main() {
     });
 
     test('accepts a Core API key', () {
-      final source = CurseForgeSource(
-        api,
-        _cfKey,
-      );
+      final source = CurseForgeSource(api, _cfKey);
       expect(source.unavailableReason, isNull);
     });
   });
@@ -102,10 +99,7 @@ void main() {
         requests.last.headers[HttpHeaders.userAgentHeader],
         CurseForgeSource.wowupCfUserAgent,
       );
-      expect(
-        captured?.url.path,
-        endsWith('/mods/42/files/1234/download-url'),
-      );
+      expect(captured?.url.path, endsWith('/mods/42/files/1234/download-url'));
       // The API request uses the browser user agent too.
       expect(
         captured?.headers[HttpHeaders.userAgentHeader],

@@ -32,9 +32,8 @@ void main() {
 
   test('symlinked routes resolve to the same installation', () async {
     final client = await createClient('real', '_forever_');
-    final link = await Link(
-      p.join(tmp.path, 'link'),
-    ).create(p.join(tmp.path, 'real'));
+    final link = await Link(p.join(tmp.path, 'link'))
+        .create(p.join(tmp.path, 'real'));
 
     final direct = await detector.fromUserPath(client);
     final viaLink = await detector.fromUserPath(
@@ -45,27 +44,31 @@ void main() {
     expect(direct.single.clientPath, viaLink.single.clientPath);
   }, skip: Platform.isWindows);
 
-  test('dedupeByPath drops stored symlink twins, keeping the preferred one', () async {
-    final client = await createClient('real', '_retail_');
-    await Link(p.join(tmp.path, 'link')).create(p.join(tmp.path, 'real'));
-    final linked = p.join(tmp.path, 'link', 'World of Warcraft', '_retail_');
-    final other = await createClient('elsewhere', '_classic_era_');
+  test(
+    'dedupeByPath drops stored symlink twins, keeping the preferred one',
+    () async {
+      final client = await createClient('real', '_retail_');
+      await Link(p.join(tmp.path, 'link')).create(p.join(tmp.path, 'real'));
+      final linked = p.join(tmp.path, 'link', 'World of Warcraft', '_retail_');
+      final other = await createClient('elsewhere', '_classic_era_');
 
-    WowInstallation entry(String id, String path, WowClientType type) =>
-        WowInstallation(
-          id: id,
-          label: type.label,
-          clientPath: path,
-          clientType: type,
-          flavor: type.defaultFlavor,
-        );
+      WowInstallation entry(String id, String path, WowClientType type) =>
+          WowInstallation(
+            id: id,
+            label: type.label,
+            clientPath: path,
+            clientType: type,
+            flavor: type.defaultFlavor,
+          );
 
-    final kept = await detector.dedupeByPath([
-      entry('a', client, WowClientType.retail),
-      entry('b', linked, WowClientType.retail),
-      entry('c', other, WowClientType.classicEra),
-    ], preferredId: 'b');
+      final kept = await detector.dedupeByPath([
+        entry('a', client, WowClientType.retail),
+        entry('b', linked, WowClientType.retail),
+        entry('c', other, WowClientType.classicEra),
+      ], preferredId: 'b');
 
-    expect(kept.map((i) => i.id), ['b', 'c']);
-  }, skip: Platform.isWindows);
+      expect(kept.map((i) => i.id), ['b', 'c']);
+    },
+    skip: Platform.isWindows,
+  );
 }

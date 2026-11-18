@@ -14,7 +14,10 @@ void main() {
     test('resolves aliases and labels as tags', () {
       expect(AddonCategory.parse('minimap'), AddonCategory.maps);
       expect(AddonCategory.parse('Quests'), AddonCategory.quests);
-      expect(AddonCategory.parse('Auktion & Wirtschaft'), AddonCategory.auction);
+      expect(
+        AddonCategory.parse('Auktion & Wirtschaft'),
+        AddonCategory.auction,
+      );
       expect(AddonCategory.parse('PVP'), AddonCategory.pvp);
     });
 
@@ -40,7 +43,10 @@ void main() {
         AddonCategory.auction.matches(_addon('TSM', 'Auction house suite')),
         isTrue,
       );
-      expect(AddonCategory.pvp.matches(_addon('Questie', 'Quest helper')), isFalse);
+      expect(
+        AddonCategory.pvp.matches(_addon('Questie', 'Quest helper')),
+        isFalse,
+      );
     });
   });
 }

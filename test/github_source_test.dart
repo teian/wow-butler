@@ -22,7 +22,10 @@ void main() {
     test('resolves known project sites to their repository', () {
       const repo = 'EllesmereGaming/EllesmereUI';
       expect(GitHubSource.parseRepo('https://ellesmereui.com/'), repo);
-      expect(GitHubSource.parseRepo('https://www.ellesmereui.com/download'), repo);
+      expect(
+        GitHubSource.parseRepo('https://www.ellesmereui.com/download'),
+        repo,
+      );
       expect(GitHubSource.parseRepo('ellesmereui.com'), repo);
     });
 

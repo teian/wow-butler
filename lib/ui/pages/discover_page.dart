@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/addon.dart';
@@ -235,9 +235,7 @@ class _CategoryChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: selected ? w.sel : (h ? w.hover : w.chip),
-          border: Border.all(
-            color: selected ? WColors.blueLight : w.border,
-          ),
+          border: Border.all(color: selected ? WColors.blueLight : w.border),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(

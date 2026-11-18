@@ -212,11 +212,11 @@ class CurseForgeSource extends AddonSource {
     // modId -> matched file; prefer files compatible with this client.
     final byMod = <int, Map<String, dynamic>>{};
     if (byFingerprint.isNotEmpty) {
-      final json =
-          await _api.postJson(Uri.parse('$_base/v1/fingerprints/$_gameId'), {
-                'fingerprints': byFingerprint.keys.toList(),
-              }, headers: _headers)
-              as Map<String, dynamic>;
+      final json = await _api.postJson(
+        Uri.parse('$_base/v1/fingerprints/$_gameId'),
+        {'fingerprints': byFingerprint.keys.toList()},
+        headers: _headers,
+      ) as Map<String, dynamic>;
       final exact = (json.obj('data') ?? const {}).objs('exactMatches');
       for (final folder in byFingerprint.entries) {
         final candidates = exact.where((m) {
@@ -281,11 +281,9 @@ class CurseForgeSource extends AddonSource {
     }
     if (byProject.isEmpty) return const [];
 
-    final json =
-        await _api.postJson(Uri.parse('$_base/v1/mods'), {
-              'modIds': byProject.keys.toList(),
-            }, headers: _headers)
-            as Map<String, dynamic>;
+    final json = await _api.postJson(Uri.parse('$_base/v1/mods'), {
+      'modIds': byProject.keys.toList(),
+    }, headers: _headers) as Map<String, dynamic>;
 
     final onDisk = {for (final f in folders) f.name.toLowerCase(): f.name};
     return [
@@ -407,10 +405,7 @@ class CurseForgeSource extends AddonSource {
     final toc = declaring.first.toc;
     final tocVersion = (toc?.builtForOtherFlavor(flavor) ?? true)
         ? null
-        : toc?.version?.replaceFirst(
-      RegExp(r'^[vV]'),
-      '',
-    );
+        : toc?.version?.replaceFirst(RegExp(r'^[vV]'), '');
     final installedFile = files.firstWhereOrNull(
       (f) =>
           tocVersion != null &&
@@ -495,15 +490,13 @@ class CurseForgeSource extends AddonSource {
   ) async {
     if (_apiKey?.isNotEmpty ?? false) {
       try {
-        final json =
-            await _api.getJson(
-                  Uri.parse(
-                    '$_base/v1/mods/${addon.externalId}/files/'
-                    '${release.id}/download-url',
-                  ),
-                  headers: _headers,
-                )
-                as Map<String, dynamic>;
+        final json = await _api.getJson(
+          Uri.parse(
+            '$_base/v1/mods/${addon.externalId}/files/'
+            '${release.id}/download-url',
+          ),
+          headers: _headers,
+        ) as Map<String, dynamic>;
         final url = json.str('data');
         if (url != null && url.isNotEmpty) return Uri.parse(url);
       } on Object {

@@ -25,9 +25,15 @@ final trayProvider = Provider<TrayController>((ref) {
   return controller;
 });
 
-class TrayController with WindowListener, TrayListener {
+class TrayController with TrayListener {
   TrayController(this._ref) {
-    windowManager.addListener(this);
+    // While the tray is active, a close request hides the window instead.
+    _closeListener = _window.addListener((event) {
+      if (event is WindowCloseRequestedEvent && _active) {
+        event.request.cancel();
+        _enqueue(_hide);
+      }
+    });
     trayManager.addListener(this);
     _ref.listen<bool>(
       settingsProvider.select((s) => s.minimizeToTray),
@@ -41,12 +47,14 @@ class TrayController with WindowListener, TrayListener {
   static const _keyQuit = 'quit';
 
   final Ref _ref;
+  final Window _window = WindowManager.instance.getCurrent()!;
+  late final ListenerId _closeListener;
   bool _active = false;
   bool _hintShown = false;
   Future<void> _queue = Future.value();
 
   void dispose() {
-    windowManager.removeListener(this);
+    _window.removeListener(_closeListener);
     trayManager.removeListener(this);
   }
 
@@ -94,9 +102,8 @@ class TrayController with WindowListener, TrayListener {
     } else {
       await trayManager.destroy();
       // Never leave the app running without a window to get back to.
-      if (!await windowManager.isVisible()) await _show();
+      if (!_window.isVisible) await _show();
     }
-    await windowManager.setPreventClose(active);
   }
 
   static String get _iconAsset {
@@ -106,12 +113,13 @@ class TrayController with WindowListener, TrayListener {
   }
 
   Future<void> _show() async {
-    await windowManager.show();
-    await windowManager.focus();
+    _window
+      ..show()
+      ..focus();
   }
 
   Future<void> _hide() async {
-    await windowManager.hide();
+    _window.hide();
     if (_hintShown) return;
     _hintShown = true;
     _ref
@@ -134,16 +142,8 @@ class TrayController with WindowListener, TrayListener {
   Future<void> _quit() async {
     _active = false;
     await trayManager.destroy();
-    await windowManager.setPreventClose(false);
-    await windowManager.destroy();
-  }
-
-  // -- WindowListener -------------------------------------------------------
-
-  @override
-  void onWindowClose() {
-    // With preventClose off the window closes on its own.
-    if (_active) _enqueue(_hide);
+    // No longer active, so the close request goes through.
+    _window.close();
   }
 
   // -- TrayListener ---------------------------------------------------------
