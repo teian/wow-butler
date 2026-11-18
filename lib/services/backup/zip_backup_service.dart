@@ -148,24 +148,35 @@ class ZipBackupService {
   }
 
   Future<List<ZipBackup>> list(String backupRoot, WowInstallation inst) async {
-    final dir = Directory(await _dirFor(backupRoot, inst));
-    if (!await dir.exists()) return const [];
-    final backups = <ZipBackup>[];
-    await for (final e in dir.list()) {
-      if (e is! File || p.extension(e.path) != '.zip') continue;
-      final stat = await e.stat();
-      final base = p.basenameWithoutExtension(e.path);
-      DateTime created;
-      try {
-        created = base.length >= 19
-            ? _stamp.parse(base.substring(0, 19))
-            : stat.modified;
-      } on FormatException {
-        created = stat.modified;
+    final dirs = [Directory(await _dirFor(backupRoot, inst))];
+    // Old folders that could not be merged (e.g. read-only) still count.
+    final root = Directory(backupRoot);
+    if (await root.exists()) {
+      await for (final e in root.list()) {
+        if (e is Directory && inst.isLegacySlug(p.basename(e.path))) {
+          dirs.add(e);
+        }
       }
-      backups.add(
-        ZipBackup(path: e.path, createdAt: created, sizeBytes: stat.size),
-      );
+    }
+    final backups = <ZipBackup>[];
+    for (final dir in dirs) {
+      if (!await dir.exists()) continue;
+      await for (final e in dir.list()) {
+        if (e is! File || p.extension(e.path).toLowerCase() != '.zip') continue;
+        final stat = await e.stat();
+        final base = p.basenameWithoutExtension(e.path);
+        DateTime created;
+        try {
+          created = base.length >= 19
+              ? _stamp.parse(base.substring(0, 19))
+              : stat.modified;
+        } on FormatException {
+          created = stat.modified;
+        }
+        backups.add(
+          ZipBackup(path: e.path, createdAt: created, sizeBytes: stat.size),
+        );
+      }
     }
     backups.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return backups;

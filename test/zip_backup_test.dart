@@ -65,6 +65,22 @@ void main() {
     });
   });
 
+  test('lists archives of old folders that cannot be merged', () async {
+    const service = ZipBackupService();
+    final root = p.join(tmp.path, 'backups');
+    // Same file name in both folders: the old one has to stay where it is.
+    for (final dir in ['retail', 'retail-12345678']) {
+      File(p.join(root, dir, '2026-01-01_10-00-00.zip'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('x');
+    }
+    final paths = [for (final b in await service.list(root, inst)) b.path];
+    expect(paths.map(p.dirname).map(p.basename).toSet(), {
+      'retail',
+      'retail-12345678',
+    });
+  });
+
   test('creates, lists, prunes and restores archives', () async {
     const service = ZipBackupService();
     final root = p.join(tmp.path, 'backups');
