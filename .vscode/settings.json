@@ -1,5 +1,5 @@
 {
-  "dart.flutterSdkPath": "${userHome}/.local/share/mise/installs/flutter/3.50.0",
+  "dart.flutterSdkPath": "${userHome}/.local/share/mise/installs/flutter/3.50.1",
   "dart.debugExternalPackageLibraries": false,
   "dart.debugSdkLibraries": false,
   "[dart]": {

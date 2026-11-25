@@ -37,22 +37,6 @@ static void set_window_icon(GtkWindow* window) {
   }
 }
 
-// Flutter 3.50.0 draws the frame shifted by half the window when its OpenGL
-// compositor cannot use glBlitFramebuffer, which it never does on the NVIDIA
-// proprietary driver: only the top right quarter of the UI shows, in the
-// bottom left corner of a black window (flutter/flutter#195885, fixed in
-// 3.50.1). Until then, render in software there. The software renderer
-// cannot draw Impeller text, so Impeller goes off with it.
-// FLUTTER_LINUX_RENDERER=opengl opts out.
-// TODO: remove once the build uses Flutter 3.50.1 or later.
-static gboolean use_software_renderer() {
-  if (g_getenv("FLUTTER_LINUX_RENDERER") == nullptr &&
-      g_file_test("/proc/driver/nvidia/version", G_FILE_TEST_EXISTS)) {
-    g_setenv("FLUTTER_LINUX_RENDERER", "software", TRUE);
-  }
-  return g_strcmp0(g_getenv("FLUTTER_LINUX_RENDERER"), "software") == 0;
-}
-
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
@@ -90,9 +74,6 @@ static void my_application_activate(GApplication* application) {
   set_window_icon(window);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
-  if (use_software_renderer()) {
-    fl_dart_project_set_enable_impeller(project, FALSE);
-  }
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
 
